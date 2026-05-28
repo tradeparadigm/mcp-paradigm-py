@@ -1,4 +1,4 @@
-"""Trade tools: desk trades and the public tape."""
+"""DRFQv2 trades — single, list, or public tape via ``mode`` param."""
 
 from __future__ import annotations
 
@@ -15,60 +15,40 @@ TradeState = Literal["COMPLETED", "PENDING", "REJECTED"]
 
 
 @server.tool(
-    name="paradigm_trades",
-    title="Trades",
+    name="paradigm_drfqv2_trades",
+    title="DRFQv2 Trades",
     annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
 )
-async def paradigm_trades(
-    state: Annotated[TradeState | None, Field(description="Filter by trade state.")] = None,
-    venue: Annotated[Venue | None, Field(description="Filter by venue.")] = None,
+async def paradigm_drfqv2_trades(
+    trade_id: Annotated[str | None, Field(description="If set, fetches one trade.")] = None,
+    mode: Annotated[
+        Literal["desk", "tape"],
+        Field(description="'desk' = your trades; 'tape' = public anonymized tape."),
+    ] = "desk",
+    state: Annotated[TradeState | None, Field(description="State filter.")] = None,
+    venue: Annotated[Venue | None, Field(description="Venue filter.")] = None,
+    strategies: Annotated[str | None, Field(description="Strategy code (tape mode).")] = None,
     product_codes: Annotated[str | None, Field(description="Product code filter.")] = None,
     cursor: Annotated[str | None, Field(description="Pagination cursor.")] = None,
     page_size: Annotated[int | None, Field(description="Page size.", ge=1, le=1000)] = None,
 ) -> Any:
-    """Cleared block trades for the desk."""
+    """List trades for the desk, fetch one, or read the public tape."""
     client = await get_paradigm_client()
+    if trade_id is not None:
+        return await client.get(f"/v2/drfq/trades/{trade_id}/")
+    if mode == "tape":
+        return await client.get(
+            "/v2/drfq/trade_tape/",
+            venue=venue,
+            strategies=strategies,
+            product_codes=product_codes,
+            cursor=cursor,
+            page_size=page_size,
+        )
     return await client.get(
         "/v2/drfq/trades/",
         state=state,
         venue=venue,
-        product_codes=product_codes,
-        cursor=cursor,
-        page_size=page_size,
-    )
-
-
-@server.tool(
-    name="paradigm_trade",
-    title="Trade",
-    annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
-)
-async def paradigm_trade(
-    trade_id: Annotated[str, Field(description="Paradigm trade id.")],
-) -> Any:
-    """Fetch a single trade."""
-    client = await get_paradigm_client()
-    return await client.get(f"/v2/drfq/trades/{trade_id}/")
-
-
-@server.tool(
-    name="paradigm_trade_tape",
-    title="Trade Tape",
-    annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
-)
-async def paradigm_trade_tape(
-    venue: Annotated[Venue | None, Field(description="Filter by venue.")] = None,
-    strategies: Annotated[str | None, Field(description="Strategy code filter.")] = None,
-    product_codes: Annotated[str | None, Field(description="Product code filter.")] = None,
-    cursor: Annotated[str | None, Field(description="Pagination cursor.")] = None,
-    page_size: Annotated[int | None, Field(description="Page size.", ge=1, le=1000)] = None,
-) -> Any:
-    """Public anonymized trade tape across the network."""
-    client = await get_paradigm_client()
-    return await client.get(
-        "/v2/drfq/trade_tape/",
-        venue=venue,
-        strategies=strategies,
         product_codes=product_codes,
         cursor=cursor,
         page_size=page_size,

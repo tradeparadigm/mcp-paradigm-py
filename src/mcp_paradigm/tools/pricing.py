@@ -1,4 +1,4 @@
-"""Leg pricing tool — split a strategy bid/ask across legs."""
+"""DRFQv2 leg pricing."""
 
 from __future__ import annotations
 
@@ -20,24 +20,18 @@ class PricingLeg(BaseModel):
 
 
 @server.tool(
-    name="paradigm_price_legs",
-    title="Price Legs",
+    name="paradigm_drfqv2_price_legs",
+    title="DRFQv2 Price Legs",
     annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
 )
-async def paradigm_price_legs(
+async def paradigm_drfqv2_price_legs(
     legs: Annotated[list[PricingLeg], Field(description="Strategy legs.", min_length=1)],
-    bid_price: Annotated[
-        str | None, Field(description="Strategy-level bid (decimal string).")
-    ] = None,
-    ask_price: Annotated[
-        str | None, Field(description="Strategy-level ask (decimal string).")
-    ] = None,
+    bid_price: Annotated[str | None, Field(description="Strategy-level bid.")] = None,
+    ask_price: Annotated[str | None, Field(description="Strategy-level ask.")] = None,
     accept_estimated_prices: Annotated[
-        bool | None, Field(description="Accept estimated prices when exact unavailable.")
+        bool | None, Field(description="Accept estimated prices.")
     ] = None,
-    algorithm_version: Annotated[
-        str | None, Field(description="Pricing algorithm version (optional).")
-    ] = None,
+    algorithm_version: Annotated[str | None, Field(description="Algorithm version.")] = None,
 ) -> Any:
     """Given strategy bid/ask, return per-leg prices."""
     client = await get_paradigm_client()

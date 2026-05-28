@@ -1,10 +1,10 @@
 {
   "manifest_version": "0.4",
   "name": "mcp-paradigm",
-  "display_name": "Paradigm DRFQv2",
+  "display_name": "Paradigm",
   "version": "0.1.0",
-  "description": "MCP server for the Paradigm trading platform — DRFQv2 RFQs, OBv1 order books, FSPD future spreads, plus identity, positions, and leaderboards.",
-  "long_description": "Wraps the Paradigm REST surfaces and exposes typed MCP tools across three active products: DRFQv2 (bilateral request-for-quote), OBv1 (Unified Markets order books — long-lived multi-counterparty auctions with maker quotes and taker fills), and FSPD (Future Spread Direct — orderbook for future spreads with limit/market orders, post-only/IOC, replace, cancel-all). Also covers firm-level identity credentials, positions, and the cross-firm trade-volume and liquidity leaderboards. Authenticated requests are HMAC-signed via a pluggable Signer (env-key for local; Vault Transit / AWS KMS planned). Order placement, quoting, market creation, and MMP reset are annotated destructive so MCP clients can prompt for approval.",
+  "description": "MCP server for the Paradigm trading platform \u2014 DRFQv2 RFQs, OBv1 order books, FSPD future spreads, plus identity, positions, and leaderboards.",
+  "long_description": "Wraps the Paradigm REST surfaces and exposes typed MCP tools across three active products: DRFQv2 (bilateral request-for-quote), OBv1 (Unified Markets order books \u2014 long-lived multi-counterparty auctions with maker quotes and taker fills), and FSPD (Future Spread Direct \u2014 orderbook for future spreads with limit/market orders, post-only/IOC, replace, cancel-all). Also covers firm-level identity credentials, positions, and the cross-firm trade-volume and liquidity leaderboards. Authenticated requests are HMAC-signed via a pluggable Signer (env-key for local; Vault Transit / AWS KMS planned). Order placement, quoting, market creation, and MMP reset are annotated destructive so MCP clients can prompt for approval.",
   "author": {
     "name": "Paradigm",
     "email": "support@paradigm.co",
@@ -38,78 +38,162 @@
     }
   },
   "tools": [
-    {"name": "paradigm_echo", "description": "Round-trip a payload through Paradigm's echo endpoint — first call to confirm access key, signing key, and base URL are correct."},
-    {"name": "paradigm_instruments", "description": "List tradable instruments. Filter by venue, base currency, kind, margin kind, state, or venue-native name."},
-    {"name": "paradigm_instrument", "description": "Fetch a single instrument by Paradigm id (including expired)."},
-    {"name": "paradigm_counterparties", "description": "List desks the firm can RFQ — desk_name, firm_name, groups, venues."},
-    {"name": "paradigm_platform_state", "description": "Current and next DRFQv2 platform state (maintenance windows)."},
-    {"name": "paradigm_rfqs", "description": "List RFQs visible to the desk. Filters: state, role, venue, strategies, product_codes."},
-    {"name": "paradigm_rfq", "description": "Fetch a single RFQ by id."},
-    {"name": "paradigm_rfq_bbo", "description": "Best bid/offer for an RFQ — mark, min/max price, greeks, per-leg bbo."},
-    {"name": "paradigm_rfq_orders", "description": "Order book against an RFQ: asks[] and bids[] with price, quantity, and desk."},
-    {"name": "paradigm_create_rfq", "description": "Create a new RFQ. Sends a request-for-quote on the wire to the chosen counterparties."},
-    {"name": "paradigm_cancel_rfq", "description": "Cancel an open RFQ before expiry."},
-    {"name": "paradigm_orders", "description": "List the desk's orders. Filters: rfq_id, state, venue, currency, base_currency."},
-    {"name": "paradigm_order", "description": "Fetch a single order by id."},
-    {"name": "paradigm_post_order", "description": "Post an order against an RFQ (maker GTC quote or taker FOK cross). Response state is PENDING; poll or subscribe for terminal state. Destructive — puts money on the wire."},
-    {"name": "paradigm_update_order", "description": "Amend an existing order (price / quantity). Destructive."},
-    {"name": "paradigm_cancel_order", "description": "Cancel a single order."},
-    {"name": "paradigm_cancel_orders_batch", "description": "Batch-cancel orders by filter. Returns successes and failures (may be 207 partial)."},
-    {"name": "paradigm_trades", "description": "Cleared block trades for the desk. Filters: state, venue, product_codes."},
-    {"name": "paradigm_trade", "description": "Fetch a single trade."},
-    {"name": "paradigm_trade_tape", "description": "Public anonymized trade tape across the network."},
-    {"name": "paradigm_price_legs", "description": "Given strategy bid/ask, return per-leg prices."},
-    {"name": "paradigm_mmp_status", "description": "DRFQv2 Market Maker Protection status — rate_limit_hit boolean."},
-    {"name": "paradigm_mmp_reset", "description": "Reset the DRFQv2 MMP flag to re-arm the desk for quoting. Destructive."},
-    {"name": "paradigm_fspd_instruments", "description": "List FSPD instruments. Filters: venue, kind, margin_type, state, clearing/settlement currency."},
-    {"name": "paradigm_fspd_strategies", "description": "List tradeable FSPD strategies (future spreads, spot/future structures)."},
-    {"name": "paradigm_fspd_strategy", "description": "Fetch a single FSPD strategy by id, including its legs."},
-    {"name": "paradigm_fspd_orderbook", "description": "Full FSPD orderbook (bids + asks with order_ids) for a strategy."},
-    {"name": "paradigm_fspd_orderbook_summary", "description": "BBO summary for an FSPD strategy: best bid/ask + last trade."},
-    {"name": "paradigm_fspd_orders", "description": "List FSPD orders for the desk. Filters: strategy_id, state, venue, kind, type."},
-    {"name": "paradigm_fspd_order", "description": "Fetch a single FSPD order with its event history."},
-    {"name": "paradigm_fspd_post_order", "description": "Post an FSPD order (LIMIT/MARKET, GTC/IOC, optional post_only). Destructive — puts money on the wire."},
-    {"name": "paradigm_fspd_replace_order", "description": "Replace an existing FSPD order in one call. Destructive."},
-    {"name": "paradigm_fspd_cancel_order", "description": "Cancel a single FSPD order."},
-    {"name": "paradigm_fspd_cancel_all_orders", "description": "Cancel all FSPD orders for the desk, optionally filtered by label."},
-    {"name": "paradigm_fspd_trades", "description": "List FSPD trades for the desk. Filters: strategy, order, venue, role, settlement currency."},
-    {"name": "paradigm_fspd_trade", "description": "Fetch a single FSPD trade with its legs."},
-    {"name": "paradigm_fspd_venues", "description": "Status of all FSPD clearing venues."},
-    {"name": "paradigm_fspd_venue", "description": "Status of a single FSPD venue."},
-    {"name": "paradigm_fspd_system_state", "description": "Operational state of the FSPD system."},
-    {"name": "paradigm_fspd_system_time", "description": "FSPD server time (unix nanoseconds)."},
-    {"name": "paradigm_fspd_mmp_status", "description": "Current FSPD Market Maker Protection status."},
-    {"name": "paradigm_fspd_mmp_reset", "description": "Reset the FSPD MMP flag. Destructive."},
-    {"name": "paradigm_obv1_instruments", "description": "List OBv1 instruments. Filters: venue, asset (BCH/BTC/ETH), kind (FUTURE/OPTION), name."},
-    {"name": "paradigm_obv1_instrument", "description": "Fetch a single OBv1 instrument by (venue, venue-native name)."},
-    {"name": "paradigm_obv1_platform_state", "description": "Current and next OBv1 platform state."},
-    {"name": "paradigm_obv1_obs", "description": "List active OBv1 order book markets (long-lived multi-counterparty auctions)."},
-    {"name": "paradigm_obv1_ob", "description": "Fetch a single OBv1 market by id."},
-    {"name": "paradigm_obv1_bbo", "description": "BBO for an OBv1 market — mark, index, per-leg bbo + greeks."},
-    {"name": "paradigm_obv1_ob_quotes", "description": "All active quotes on an OBv1 market (asks/bids)."},
-    {"name": "paradigm_obv1_create_ob", "description": "Open a new OBv1 order book market. Multi-counterparty, public. Destructive."},
-    {"name": "paradigm_obv1_quotes", "description": "List the desk's OBv1 quotes."},
-    {"name": "paradigm_obv1_quote", "description": "Fetch a single OBv1 quote by id."},
-    {"name": "paradigm_obv1_post_quote", "description": "Post a maker quote on an OBv1 market (post_only / IOC supported). Destructive."},
-    {"name": "paradigm_obv1_update_quote", "description": "Replace an existing OBv1 quote in one call. Destructive."},
-    {"name": "paradigm_obv1_cancel_quote", "description": "Cancel a single OBv1 quote."},
-    {"name": "paradigm_obv1_cancel_quotes_batch", "description": "Batch-cancel OBv1 quotes by filter. Returns an action_id."},
-    {"name": "paradigm_obv1_orders", "description": "List OBv1 fill orders (taker-side fills against maker quotes)."},
-    {"name": "paradigm_obv1_order", "description": "Fetch a single OBv1 fill order by id."},
-    {"name": "paradigm_obv1_trades", "description": "List OBv1 block trades visible to the desk."},
-    {"name": "paradigm_obv1_trade", "description": "Fetch detailed BlockTrade if the desk is part of it."},
-    {"name": "paradigm_obv1_blotter", "description": "The desk's OBv1 block trades ordered by traded_at descending."},
-    {"name": "paradigm_obv1_trade_tape", "description": "Public anonymized OBv1 trade tape."},
-    {"name": "paradigm_obv1_price_legs", "description": "Per-leg pricing for an OBv1 strategy bid/ask."},
-    {"name": "paradigm_obv1_mmp_status", "description": "Current OBv1 Market Maker Protection status."},
-    {"name": "paradigm_obv1_mmp_reset", "description": "Reset the OBv1 MMP flag. Destructive."},
-    {"name": "paradigm_identity_credentials", "description": "Active venue API credentials registered for the desk."},
-    {"name": "paradigm_positions", "description": "All positions for the trading desk across venues."},
-    {"name": "paradigm_positions_refresh", "description": "Trigger an async refresh of the desk positions cache."},
-    {"name": "paradigm_leaderboard_trade_volume", "description": "Cross-firm trade volume leaderboard."},
-    {"name": "paradigm_leaderboard_liquidity_fills", "description": "Liquidity fills leaderboard — quote rate, fill rate, spread rank."},
-    {"name": "paradigm_leaderboard_liquidity_responses", "description": "Liquidity response leaderboard — response-time buckets and quote rate."},
-    {"name": "paradigm_leaderboard_set_preferences", "description": "Set the firm's leaderboard anonymity preference."}
+    {
+      "name": "paradigm_echo",
+      "description": "Round-trip the Paradigm echo endpoint \u2014 first call to verify access key, signing key, and base URL."
+    },
+    {
+      "name": "paradigm_desk_overview",
+      "description": "One-shot desk health snapshot: positions, identity credentials, MMP status across DRFQv2/OBv1/FSPD, plus per-product platform/system state."
+    },
+    {
+      "name": "paradigm_kill_switch",
+      "description": "Cancel ALL active DRFQv2 orders, OBv1 quotes, and FSPD orders in one call. Destructive."
+    },
+    {
+      "name": "paradigm_drfqv2_rfqs",
+      "description": "List DRFQv2 RFQs. For full state (RFQ + BBO + order book) use paradigm_drfqv2_rfq_snapshot."
+    },
+    {
+      "name": "paradigm_drfqv2_rfq_snapshot",
+      "description": "Full state of a DRFQv2 RFQ in one call: RFQ + BBO + order book."
+    },
+    {
+      "name": "paradigm_drfqv2_create_rfq",
+      "description": "Create a new DRFQv2 RFQ to chosen counterparties."
+    },
+    {
+      "name": "paradigm_drfqv2_orders",
+      "description": "List DRFQv2 orders, or fetch one by order_id."
+    },
+    {
+      "name": "paradigm_drfqv2_post_order",
+      "description": "Post a new DRFQv2 order, or amend if order_id set. Destructive."
+    },
+    {
+      "name": "paradigm_drfqv2_cancel",
+      "description": "Cancel a DRFQv2 RFQ, single order, or batch by filter via target='rfq'|'order'|'orders'."
+    },
+    {
+      "name": "paradigm_drfqv2_trades",
+      "description": "DRFQv2 trades \u2014 list, single by id, or public tape (mode='tape')."
+    },
+    {
+      "name": "paradigm_drfqv2_instruments",
+      "description": "List DRFQv2 instruments, or fetch one by instrument_id."
+    },
+    {
+      "name": "paradigm_drfqv2_counterparties",
+      "description": "List desks the firm can RFQ on DRFQv2."
+    },
+    {
+      "name": "paradigm_drfqv2_price_legs",
+      "description": "DRFQv2 leg pricing \u2014 split strategy bid/ask across legs."
+    },
+    {
+      "name": "paradigm_drfqv2_mmp",
+      "description": "DRFQv2 MMP \u2014 action='status' to read, 'reset' to re-arm."
+    },
+    {
+      "name": "paradigm_obv1_obs",
+      "description": "List active OBv1 order book markets. For full state use paradigm_obv1_market_snapshot."
+    },
+    {
+      "name": "paradigm_obv1_market_snapshot",
+      "description": "Full state of an OBv1 market: market + BBO + quotes book."
+    },
+    {
+      "name": "paradigm_obv1_create_ob",
+      "description": "Open a new OBv1 order book market (public, multi-counterparty)."
+    },
+    {
+      "name": "paradigm_obv1_quotes",
+      "description": "List the desk's OBv1 quotes, or fetch one by quote_id."
+    },
+    {
+      "name": "paradigm_obv1_post_quote",
+      "description": "Post a maker quote on an OBv1 market, or replace if quote_id set. Destructive."
+    },
+    {
+      "name": "paradigm_obv1_cancel",
+      "description": "Cancel a single OBv1 quote, or batch by filter."
+    },
+    {
+      "name": "paradigm_obv1_orders",
+      "description": "List OBv1 fill orders (taker fills against quotes), or fetch one by id."
+    },
+    {
+      "name": "paradigm_obv1_trades",
+      "description": "OBv1 trades \u2014 mode='trades' visible, 'blotter' desk-only, 'tape' public anonymized."
+    },
+    {
+      "name": "paradigm_obv1_instruments",
+      "description": "List OBv1 instruments, or fetch one by (venue, instrument_name)."
+    },
+    {
+      "name": "paradigm_obv1_price_legs",
+      "description": "OBv1 leg pricing."
+    },
+    {
+      "name": "paradigm_obv1_mmp",
+      "description": "OBv1 MMP \u2014 action='status' or 'reset'."
+    },
+    {
+      "name": "paradigm_fspd_instruments",
+      "description": "List FSPD instruments. Filters: venue, kind, margin_type, state, clearing/settlement currency."
+    },
+    {
+      "name": "paradigm_fspd_strategies",
+      "description": "List FSPD strategies, or fetch one by strategy_id (returns legs)."
+    },
+    {
+      "name": "paradigm_fspd_orderbook",
+      "description": "FSPD orderbook \u2014 BBO summary by default, full depth if full=True."
+    },
+    {
+      "name": "paradigm_fspd_orders",
+      "description": "List FSPD orders, or fetch one by order_id."
+    },
+    {
+      "name": "paradigm_fspd_post_order",
+      "description": "Post a new FSPD order, or replace if order_id set. Destructive."
+    },
+    {
+      "name": "paradigm_fspd_cancel",
+      "description": "Cancel a single FSPD order, or all orders (optional label filter)."
+    },
+    {
+      "name": "paradigm_fspd_trades",
+      "description": "List FSPD trades, or fetch one by trade_id."
+    },
+    {
+      "name": "paradigm_fspd_venues",
+      "description": "Status of all FSPD venues, or a single venue."
+    },
+    {
+      "name": "paradigm_fspd_system",
+      "description": "FSPD operational state + server time, combined."
+    },
+    {
+      "name": "paradigm_fspd_mmp",
+      "description": "FSPD MMP \u2014 action='status' or 'reset'."
+    },
+    {
+      "name": "paradigm_identity_credentials",
+      "description": "Active venue API credentials registered for the desk."
+    },
+    {
+      "name": "paradigm_positions",
+      "description": "Desk positions across venues. refresh=True forces an async refresh first."
+    },
+    {
+      "name": "paradigm_leaderboard",
+      "description": "Cross-firm leaderboard for trade_volume, liquidity_fills, or liquidity_responses (metric param)."
+    },
+    {
+      "name": "paradigm_leaderboard_preferences",
+      "description": "Set the firm's leaderboard anonymity preference."
+    }
   ],
   "user_config": {
     "paradigm_access_key": {
@@ -136,7 +220,7 @@
     "paradigm_account": {
       "type": "string",
       "title": "Account (multi-desk)",
-      "description": "Optional account name for multi-desk firms — sent as the Paradigm-Account header.",
+      "description": "Optional account name for multi-desk firms \u2014 sent as the Paradigm-Account header.",
       "required": false
     },
     "paradigm_fspd_base_url": {
@@ -147,7 +231,10 @@
     }
   },
   "compatibility": {
-    "platforms": ["darwin", "linux"],
+    "platforms": [
+      "darwin",
+      "linux"
+    ],
     "runtimes": {
       "python": ">=3.12"
     }

@@ -23,13 +23,11 @@ SettlementCurrency = Literal["USD", "BTC", "SOL", "AVAX", "ETH"]
     annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
 )
 async def paradigm_fspd_instruments(
-    venue: Annotated[str | None, Field(description="Clearing venue filter.")] = None,
-    kind: Annotated[InstrumentKind | None, Field(description="ANY, FUTURE, or SPOT.")] = None,
-    margin_type: Annotated[MarginType | None, Field(description="INVERSE or LINEAR.")] = None,
-    state: Annotated[InstrumentState | None, Field(description="ACTIVE, SETTLED, EXPIRED.")] = None,
-    clearing_currency: Annotated[
-        str | None, Field(description="Currency the order size is submitted in.")
-    ] = None,
+    venue: Annotated[str | None, Field(description="Clearing venue.")] = None,
+    kind: Annotated[InstrumentKind | None, Field(description="ANY, FUTURE, SPOT.")] = None,
+    margin_type: Annotated[MarginType | None, Field(description="INVERSE/LINEAR.")] = None,
+    state: Annotated[InstrumentState | None, Field(description="State filter.")] = None,
+    clearing_currency: Annotated[str | None, Field(description="Clearing currency.")] = None,
     settlement_currency: Annotated[
         SettlementCurrency | None, Field(description="Settlement currency.")
     ] = None,
@@ -59,19 +57,24 @@ async def paradigm_fspd_instruments(
     annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
 )
 async def paradigm_fspd_strategies(
-    id: Annotated[str | None, Field(description="Filter by strategy id.")] = None,
+    strategy_id: Annotated[
+        str | None, Field(description="If set, fetches a single strategy by id.")
+    ] = None,
+    id: Annotated[str | None, Field(description="Strategy id filter (server-side).")] = None,
     venue: Annotated[str | None, Field(description="Clearing venue.")] = None,
-    kind: Annotated[StrategyKind | None, Field(description="ANY, FUTURE, SPOT_FUTURE.")] = None,
-    margin_type: Annotated[MarginType | None, Field(description="INVERSE or LINEAR.")] = None,
-    state: Annotated[InstrumentState | None, Field(description="ACTIVE, SETTLED, EXPIRED.")] = None,
-    base_currency: Annotated[str | None, Field(description="Base currency filter.")] = None,
+    kind: Annotated[StrategyKind | None, Field(description="ANY/FUTURE/SPOT_FUTURE.")] = None,
+    margin_type: Annotated[MarginType | None, Field(description="INVERSE/LINEAR.")] = None,
+    state: Annotated[InstrumentState | None, Field(description="State filter.")] = None,
+    base_currency: Annotated[str | None, Field(description="Base currency.")] = None,
     clearing_currency: Annotated[str | None, Field(description="Clearing currency.")] = None,
     settlement_currency: Annotated[
         SettlementCurrency | None, Field(description="Settlement currency.")
     ] = None,
 ) -> Any:
-    """List tradeable FSPD strategies (future spreads + spot/future)."""
+    """List FSPD strategies, or fetch a single one with its legs."""
     client = await get_fspd_client()
+    if strategy_id is not None:
+        return await client.get(f"/v1/fs/instruments/{strategy_id}")
     return await client.get(
         "/v1/fs/strategies",
         id=id,
@@ -86,37 +89,18 @@ async def paradigm_fspd_strategies(
 
 
 @server.tool(
-    name="paradigm_fspd_strategy",
-    title="FSPD Strategy",
-    annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
-)
-async def paradigm_fspd_strategy(
-    strategy_id: Annotated[str, Field(description="FSPD strategy id.")],
-) -> Any:
-    """Fetch a single FSPD strategy by id, with its legs."""
-    client = await get_fspd_client()
-    return await client.get(f"/v1/fs/instruments/{strategy_id}")
-
-
-@server.tool(
     name="paradigm_fspd_venues",
     title="FSPD Venues",
     annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
 )
-async def paradigm_fspd_venues() -> Any:
-    """Status of all FSPD clearing venues."""
-    client = await get_fspd_client()
-    return await client.get("/v1/fs/venues")
-
-
-@server.tool(
-    name="paradigm_fspd_venue",
-    title="FSPD Venue",
-    annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
-)
-async def paradigm_fspd_venue(
-    venue: Annotated[Literal["dbt", "byb", "bit"], Field(description="Venue code.")],
+async def paradigm_fspd_venues(
+    venue: Annotated[
+        Literal["dbt", "byb", "bit"] | None,
+        Field(description="If set, fetches a single venue's status."),
+    ] = None,
 ) -> Any:
-    """Status of a single FSPD venue."""
+    """Status of all FSPD venues, or one venue if ``venue`` is set."""
     client = await get_fspd_client()
-    return await client.get(f"/v1/fs/venues/{venue}")
+    if venue is not None:
+        return await client.get(f"/v1/fs/venues/{venue}")
+    return await client.get("/v1/fs/venues")

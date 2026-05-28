@@ -1,4 +1,8 @@
-"""Reference data tools: instruments, counterparties, platform state."""
+"""DRFQv2 reference data: instruments + counterparties.
+
+Platform state is part of ``paradigm_desk_overview``. Single-instrument
+fetch is via ``paradigm_drfqv2_instruments(instrument_id=...)``.
+"""
 
 from __future__ import annotations
 
@@ -18,11 +22,14 @@ InstrumentState = Literal["ACTIVE", "EXPIRED"]
 
 
 @server.tool(
-    name="paradigm_instruments",
-    title="Instruments",
+    name="paradigm_drfqv2_instruments",
+    title="DRFQv2 Instruments",
     annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
 )
-async def paradigm_instruments(
+async def paradigm_drfqv2_instruments(
+    instrument_id: Annotated[
+        str | None, Field(description="If set, fetches a single instrument by id.")
+    ] = None,
     venue: Annotated[Venue | None, Field(description="Filter by venue.")] = None,
     base_currency: Annotated[
         BaseCurrency | None, Field(description="Filter by base currency.")
@@ -37,8 +44,10 @@ async def paradigm_instruments(
     cursor: Annotated[str | None, Field(description="Pagination cursor.")] = None,
     page_size: Annotated[int | None, Field(description="Page size.", ge=1, le=1000)] = None,
 ) -> Any:
-    """List tradable instruments supported on Paradigm."""
+    """List or fetch a single DRFQv2 instrument (including expired)."""
     client = await get_paradigm_client()
+    if instrument_id is not None:
+        return await client.get(f"/v2/drfq/instruments/{instrument_id}/")
     return await client.get(
         "/v2/drfq/instruments/",
         venue=venue,
@@ -54,24 +63,11 @@ async def paradigm_instruments(
 
 
 @server.tool(
-    name="paradigm_instrument",
-    title="Instrument",
+    name="paradigm_drfqv2_counterparties",
+    title="DRFQv2 Counterparties",
     annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
 )
-async def paradigm_instrument(
-    instrument_id: Annotated[str, Field(description="Paradigm instrument id.")],
-) -> Any:
-    """Fetch a single instrument by Paradigm id (including expired)."""
-    client = await get_paradigm_client()
-    return await client.get(f"/v2/drfq/instruments/{instrument_id}/")
-
-
-@server.tool(
-    name="paradigm_counterparties",
-    title="Counterparties",
-    annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
-)
-async def paradigm_counterparties(
+async def paradigm_drfqv2_counterparties(
     cursor: Annotated[str | None, Field(description="Pagination cursor.")] = None,
     page_size: Annotated[int | None, Field(description="Page size.", ge=1, le=1000)] = None,
 ) -> Any:
@@ -82,14 +78,3 @@ async def paradigm_counterparties(
         cursor=cursor,
         page_size=page_size,
     )
-
-
-@server.tool(
-    name="paradigm_platform_state",
-    title="Platform State",
-    annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
-)
-async def paradigm_platform_state() -> Any:
-    """Current and next DRFQv2 platform state (maintenance windows)."""
-    client = await get_paradigm_client()
-    return await client.get("/v2/drfq/platform_state/")

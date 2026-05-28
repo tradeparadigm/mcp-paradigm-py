@@ -1,8 +1,4 @@
-"""OBv1 (Order Books, Unified Markets) tool modules.
-
-Importing each submodule runs its decorators and attaches the tools to
-the server singleton in ``mcp_paradigm.server.server``.
-"""
+"""OBv1 (Unified Markets order books) tool modules."""
 
 from . import (
     markets,

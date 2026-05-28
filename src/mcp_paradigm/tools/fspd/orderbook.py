@@ -1,4 +1,4 @@
-"""FSPD orderbook tools — full depth and BBO summary."""
+"""FSPD orderbook — summary BBO by default, full depth on demand."""
 
 from __future__ import annotations
 
@@ -18,20 +18,12 @@ from mcp_paradigm.utils.paradigm_client import get_fspd_client
 )
 async def paradigm_fspd_orderbook(
     strategy_id: Annotated[str, Field(description="FSPD strategy id.")],
+    full: Annotated[
+        bool,
+        Field(description="True returns full asks/bids depth; false returns BBO summary."),
+    ] = False,
 ) -> Any:
-    """Full orderbook (bids + asks with order_ids) for an FSPD strategy."""
+    """Orderbook for an FSPD strategy — BBO summary by default, full depth if ``full=True``."""
     client = await get_fspd_client()
-    return await client.get(f"/v1/fs/instruments/{strategy_id}/order-book")
-
-
-@server.tool(
-    name="paradigm_fspd_orderbook_summary",
-    title="FSPD Orderbook Summary",
-    annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
-)
-async def paradigm_fspd_orderbook_summary(
-    strategy_id: Annotated[str, Field(description="FSPD strategy id.")],
-) -> Any:
-    """BBO summary for an FSPD strategy — best bid/ask, last trade."""
-    client = await get_fspd_client()
-    return await client.get(f"/v1/fs/instruments/{strategy_id}/order-book-summary")
+    suffix = "order-book" if full else "order-book-summary"
+    return await client.get(f"/v1/fs/instruments/{strategy_id}/{suffix}")

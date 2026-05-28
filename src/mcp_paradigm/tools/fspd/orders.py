@@ -1,4 +1,4 @@
-"""FSPD order lifecycle: list, get, create, replace, cancel."""
+"""FSPD orders: list/single, post/replace, cancel."""
 
 from __future__ import annotations
 
@@ -25,20 +25,21 @@ SettlementCurrency = Literal["USD", "BTC", "SOL", "AVAX", "ETH"]
     annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
 )
 async def paradigm_fspd_orders(
-    strategy_id: Annotated[str | None, Field(description="Filter by strategy id.")] = None,
-    state: Annotated[OrderState | None, Field(description="Filter by order state.")] = None,
-    venue: Annotated[Venue | None, Field(description="Clearing venue filter.")] = None,
+    order_id: Annotated[str | None, Field(description="If set, fetches a single order.")] = None,
+    strategy_id: Annotated[str | None, Field(description="Filter by strategy.")] = None,
+    state: Annotated[OrderState | None, Field(description="Order state.")] = None,
+    venue: Annotated[Venue | None, Field(description="Venue filter.")] = None,
     kind: Annotated[Kind | None, Field(description="ANY or FUTURE.")] = None,
     type: Annotated[OrderType | None, Field(description="LIMIT or MARKET.")] = None,
     settlement_currency: Annotated[
         SettlementCurrency | None, Field(description="Settlement currency.")
     ] = None,
-    from_order_id: Annotated[
-        str | None, Field(description="Cursor — start after this order id.")
-    ] = None,
+    from_order_id: Annotated[str | None, Field(description="Cursor.")] = None,
 ) -> Any:
-    """List FSPD orders for the desk."""
+    """List FSPD orders for the desk, or fetch one by id."""
     client = await get_fspd_client()
+    if order_id is not None:
+        return await client.get(f"/v1/fs/orders/{order_id}")
     return await client.get(
         "/v1/fs/orders",
         strategyId=strategy_id,
@@ -52,46 +53,29 @@ async def paradigm_fspd_orders(
 
 
 @server.tool(
-    name="paradigm_fspd_order",
-    title="FSPD Order",
-    annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
-)
-async def paradigm_fspd_order(
-    order_id: Annotated[str, Field(description="FSPD order id.")],
-) -> Any:
-    """Fetch a single FSPD order, with its event history."""
-    client = await get_fspd_client()
-    return await client.get(f"/v1/fs/orders/{order_id}")
-
-
-@server.tool(
     name="paradigm_fspd_post_order",
-    title="FSPD Post Order",
+    title="FSPD Post / Replace Order",
     annotations=ToolAnnotations(destructiveHint=True, idempotentHint=False),
 )
 async def paradigm_fspd_post_order(
     strategy_id: Annotated[str, Field(description="FSPD strategy to trade.")],
     side: Annotated[Side, Field(description="BUY or SELL.")],
-    amount_decimal: Annotated[
-        str, Field(description="Order size (decimal string) in clearing currency.")
-    ],
+    amount_decimal: Annotated[str, Field(description="Order size (decimal) in clearing currency.")],
     type: Annotated[OrderType, Field(description="LIMIT or MARKET.")] = "LIMIT",
-    price: Annotated[
+    price: Annotated[str | None, Field(description="Limit price (decimal).")] = None,
+    time_in_force: Annotated[TimeInForce, Field(description="GTC or IOC.")] = "GOOD_TILL_CANCELED",
+    post_only: Annotated[bool | None, Field(description="Post-only flag.")] = None,
+    label: Annotated[str | None, Field(description="Caller label.")] = None,
+    account_name: Annotated[str | None, Field(description="Venue account name.")] = None,
+    order_id: Annotated[
         str | None,
-        Field(description="Limit price (decimal string in quote currency). Required for LIMIT."),
-    ] = None,
-    time_in_force: Annotated[
-        TimeInForce, Field(description="GOOD_TILL_CANCELED or IMMEDIATE_OR_CANCEL.")
-    ] = "GOOD_TILL_CANCELED",
-    post_only: Annotated[
-        bool | None, Field(description="Post-only flag — reject if would cross.")
-    ] = None,
-    label: Annotated[str | None, Field(description="Caller idempotency / grouping label.")] = None,
-    account_name: Annotated[
-        str | None, Field(description="Venue API credential account name.")
+        Field(description="If set, replaces the existing order (POST /replace) instead of new."),
     ] = None,
 ) -> Any:
-    """Post an FSPD order. Destructive — puts money on the wire."""
+    """Post a new FSPD order, or replace one if ``order_id`` is set.
+
+    Destructive — puts money on the wire.
+    """
     client = await get_fspd_client()
     body: dict[str, Any] = {
         "strategy_id": strategy_id,
@@ -108,69 +92,29 @@ async def paradigm_fspd_post_order(
         body["label"] = label
     if account_name is not None:
         body["account_name"] = account_name
+    if order_id is not None:
+        return await client.post(f"/v1/fs/orders/{order_id}/replace", json_body=body)
     return await client.post("/v1/fs/orders", json_body=body)
 
 
 @server.tool(
-    name="paradigm_fspd_replace_order",
-    title="FSPD Replace Order",
-    annotations=ToolAnnotations(destructiveHint=True, idempotentHint=False),
-)
-async def paradigm_fspd_replace_order(
-    order_id: Annotated[str, Field(description="Order id to replace.")],
-    strategy_id: Annotated[str, Field(description="FSPD strategy.")],
-    side: Annotated[Side, Field(description="BUY or SELL.")],
-    amount_decimal: Annotated[str, Field(description="New order size (decimal).")],
-    type: Annotated[OrderType, Field(description="LIMIT or MARKET.")] = "LIMIT",
-    price: Annotated[str | None, Field(description="New limit price.")] = None,
-    time_in_force: Annotated[TimeInForce, Field(description="TIF.")] = "GOOD_TILL_CANCELED",
-    post_only: Annotated[bool | None, Field(description="Post-only flag.")] = None,
-    label: Annotated[str | None, Field(description="Caller label.")] = None,
-    account_name: Annotated[str | None, Field(description="Venue account name.")] = None,
-) -> Any:
-    """Replace an existing FSPD order (cancel + new in one call)."""
-    client = await get_fspd_client()
-    body: dict[str, Any] = {
-        "strategy_id": strategy_id,
-        "side": side,
-        "amount_decimal": amount_decimal,
-        "type": type,
-        "time_in_force": time_in_force,
-    }
-    if price is not None:
-        body["price"] = price
-    if post_only is not None:
-        body["post_only"] = post_only
-    if label is not None:
-        body["label"] = label
-    if account_name is not None:
-        body["account_name"] = account_name
-    return await client.post(f"/v1/fs/orders/{order_id}/replace", json_body=body)
-
-
-@server.tool(
-    name="paradigm_fspd_cancel_order",
-    title="FSPD Cancel Order",
+    name="paradigm_fspd_cancel",
+    title="FSPD Cancel",
     annotations=ToolAnnotations(destructiveHint=True, idempotentHint=True),
 )
-async def paradigm_fspd_cancel_order(
-    order_id: Annotated[str, Field(description="Order id to cancel.")],
-) -> dict[str, Any]:
-    """Cancel a single FSPD order."""
-    client = await get_fspd_client()
-    await client.delete(f"/v1/fs/orders/{order_id}")
-    return {"order_id": order_id, "canceled": True}
-
-
-@server.tool(
-    name="paradigm_fspd_cancel_all_orders",
-    title="FSPD Cancel All Orders",
-    annotations=ToolAnnotations(destructiveHint=True, idempotentHint=True),
-)
-async def paradigm_fspd_cancel_all_orders(
+async def paradigm_fspd_cancel(
+    order_id: Annotated[
+        str | None,
+        Field(
+            description="If set, cancels a single order; otherwise cancels all (with optional label)."
+        ),
+    ] = None,
     label: Annotated[str | None, Field(description="Cancel only orders with this label.")] = None,
 ) -> dict[str, Any]:
-    """Cancel all FSPD orders for the desk, optionally filtered by label."""
+    """Cancel a single FSPD order, or all orders for the desk (optionally by label)."""
     client = await get_fspd_client()
+    if order_id is not None:
+        await client.delete(f"/v1/fs/orders/{order_id}")
+        return {"order_id": order_id, "canceled": True}
     await client.delete("/v1/fs/orders", label=label)
     return {"label": label, "canceled_all": True}

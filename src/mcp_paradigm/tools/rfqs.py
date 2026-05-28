@@ -1,4 +1,4 @@
-"""RFQ lifecycle tools (taker side)."""
+"""DRFQv2 RFQ lifecycle. Single-fetch is via ``paradigm_drfqv2_rfq_snapshot``."""
 
 from __future__ import annotations
 
@@ -24,11 +24,11 @@ class LegCreate(BaseModel):
 
 
 @server.tool(
-    name="paradigm_rfqs",
-    title="RFQs",
+    name="paradigm_drfqv2_rfqs",
+    title="DRFQv2 RFQs",
     annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
 )
-async def paradigm_rfqs(
+async def paradigm_drfqv2_rfqs(
     state: Annotated[RFQState | None, Field(description="Filter by RFQ state.")] = None,
     role: Annotated[Role | None, Field(description="MAKER or TAKER perspective.")] = None,
     venue: Annotated[Venue | None, Field(description="Filter by venue.")] = None,
@@ -37,7 +37,11 @@ async def paradigm_rfqs(
     cursor: Annotated[str | None, Field(description="Pagination cursor.")] = None,
     page_size: Annotated[int | None, Field(description="Page size.", ge=1, le=1000)] = None,
 ) -> Any:
-    """List RFQs visible to the desk."""
+    """List DRFQv2 RFQs visible to the desk.
+
+    For a single RFQ with its BBO and order book, use
+    ``paradigm_drfqv2_rfq_snapshot`` instead.
+    """
     client = await get_paradigm_client()
     return await client.get(
         "/v2/drfq/rfqs/",
@@ -52,50 +56,11 @@ async def paradigm_rfqs(
 
 
 @server.tool(
-    name="paradigm_rfq",
-    title="RFQ",
-    annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
-)
-async def paradigm_rfq(
-    rfq_id: Annotated[str, Field(description="Paradigm RFQ id.")],
-) -> Any:
-    """Fetch a single RFQ."""
-    client = await get_paradigm_client()
-    return await client.get(f"/v2/drfq/rfqs/{rfq_id}/")
-
-
-@server.tool(
-    name="paradigm_rfq_bbo",
-    title="RFQ BBO",
-    annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
-)
-async def paradigm_rfq_bbo(
-    rfq_id: Annotated[str, Field(description="Paradigm RFQ id.")],
-) -> Any:
-    """Best bid/offer for an RFQ — mark, min/max price, greeks, per-leg bbo."""
-    client = await get_paradigm_client()
-    return await client.get(f"/v2/drfq/rfqs/{rfq_id}/bbo/")
-
-
-@server.tool(
-    name="paradigm_rfq_orders",
-    title="RFQ Order Book",
-    annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
-)
-async def paradigm_rfq_orders(
-    rfq_id: Annotated[str, Field(description="Paradigm RFQ id.")],
-) -> Any:
-    """Order book against an RFQ: asks[] and bids[] with price/quantity/desk."""
-    client = await get_paradigm_client()
-    return await client.get(f"/v2/drfq/rfqs/{rfq_id}/orders/")
-
-
-@server.tool(
-    name="paradigm_create_rfq",
-    title="Create RFQ",
+    name="paradigm_drfqv2_create_rfq",
+    title="DRFQv2 Create RFQ",
     annotations=ToolAnnotations(destructiveHint=False, idempotentHint=False),
 )
-async def paradigm_create_rfq(
+async def paradigm_drfqv2_create_rfq(
     venue: Annotated[Venue, Field(description="Settlement venue.")],
     legs: Annotated[list[LegCreate], Field(description="Strategy legs.", min_length=1)],
     quantity: Annotated[str, Field(description="RFQ quantity (decimal string).")],
@@ -117,10 +82,10 @@ async def paradigm_create_rfq(
         Field(description="OPEN sends now; DRAFT stages without notifying counterparties."),
     ] = "RFQState.OPEN",
 ) -> Any:
-    """Create a new RFQ. Returns the RFQ entity including ``id``.
+    """Create a new DRFQv2 RFQ to the chosen counterparties.
 
-    This places a request-for-quote on the wire to the chosen
-    counterparties — gate behind explicit user confirmation.
+    Places a request-for-quote on the wire — gate behind explicit user
+    confirmation.
     """
     client = await get_paradigm_client()
     body: dict[str, Any] = {
@@ -136,17 +101,3 @@ async def paradigm_create_rfq(
     if label is not None:
         body["label"] = label
     return await client.post("/v2/drfq/rfqs/", json_body=body)
-
-
-@server.tool(
-    name="paradigm_cancel_rfq",
-    title="Cancel RFQ",
-    annotations=ToolAnnotations(destructiveHint=True, idempotentHint=True),
-)
-async def paradigm_cancel_rfq(
-    rfq_id: Annotated[str, Field(description="Paradigm RFQ id.")],
-) -> dict[str, Any]:
-    """Cancel an open RFQ before expiry."""
-    client = await get_paradigm_client()
-    await client.delete(f"/v2/drfq/rfqs/{rfq_id}/")
-    return {"rfq_id": rfq_id, "canceled": True}

@@ -89,38 +89,36 @@ If signing is broken you'll see a 401 with `Invalid signature`.
 
 ## Tool surface
 
-Grouped by responsibility — see DESIGN.md for the full mapping to
-Paradigm REST endpoints, scopes, and approval gates.
+39 tools, workflow-oriented. Full mapping in [DESIGN.md](DESIGN.md).
 
-### DRFQv2 (bilateral RFQ)
+### Start here
 
-| Group | Tools |
+| Tool | What it does |
 |---|---|
-| Reference data | `paradigm_instruments`, `paradigm_instrument`, `paradigm_counterparties`, `paradigm_platform_state` |
-| RFQ lifecycle | `paradigm_rfqs`, `paradigm_rfq`, `paradigm_rfq_bbo`, `paradigm_rfq_orders`, `paradigm_create_rfq`, `paradigm_cancel_rfq` |
-| Order lifecycle | `paradigm_orders`, `paradigm_order`, `paradigm_post_order`, `paradigm_update_order`, `paradigm_cancel_order`, `paradigm_cancel_orders_batch` |
-| Trades | `paradigm_trades`, `paradigm_trade`, `paradigm_trade_tape` |
-| Pricing | `paradigm_price_legs` |
-| MMP | `paradigm_mmp_status`, `paradigm_mmp_reset` |
-| Self-test | `paradigm_echo` |
+| `paradigm_echo` | Signing self-test — first call after wiring. |
+| `paradigm_desk_overview` | Positions + MMP + platform state across all products in one call. |
+| `paradigm_drfqv2_rfq_snapshot(rfq_id)` | RFQ + BBO + order book for a DRFQv2 RFQ. |
+| `paradigm_obv1_market_snapshot(ob_id)` | OB + BBO + quotes book for an OBv1 market. |
+| `paradigm_kill_switch` | Cancel all orders/quotes across all products. **Destructive.** |
 
-### FSPD (Future Spread Direct)
+### Per-product (granular)
 
-| Group | Tools |
+| Product | Tools |
 |---|---|
-| Reference | `paradigm_fspd_instruments`, `paradigm_fspd_strategies`, `paradigm_fspd_strategy`, `paradigm_fspd_venues`, `paradigm_fspd_venue` |
-| Orderbook | `paradigm_fspd_orderbook`, `paradigm_fspd_orderbook_summary` |
-| Orders | `paradigm_fspd_orders`, `paradigm_fspd_order`, `paradigm_fspd_post_order`, `paradigm_fspd_replace_order`, `paradigm_fspd_cancel_order`, `paradigm_fspd_cancel_all_orders` |
-| Trades | `paradigm_fspd_trades`, `paradigm_fspd_trade` |
-| System | `paradigm_fspd_system_state`, `paradigm_fspd_system_time` |
-| MMP | `paradigm_fspd_mmp_status`, `paradigm_fspd_mmp_reset` |
+| DRFQv2 | `paradigm_drfqv2_{rfqs, create_rfq, orders, post_order, cancel, trades, instruments, counterparties, price_legs, mmp}` |
+| OBv1 | `paradigm_obv1_{obs, create_ob, quotes, post_quote, cancel, orders, trades, instruments, price_legs, mmp}` |
+| FSPD | `paradigm_fspd_{instruments, strategies, orderbook, orders, post_order, cancel, trades, venues, system, mmp}` |
+| Firm | `paradigm_identity_credentials`, `paradigm_positions`, `paradigm_leaderboard`, `paradigm_leaderboard_preferences` |
 
-Tools that put money on the wire — `paradigm_post_order`,
-`paradigm_update_order`, `paradigm_create_rfq`, `paradigm_mmp_reset`,
-`paradigm_fspd_post_order`, `paradigm_fspd_replace_order`,
-`paradigm_fspd_mmp_reset`, and the cancel variants — are annotated
-`destructiveHint=true` so MCP clients can show an approval prompt
-before execution.
+### Conventions
+
+- List and single-fetch share one tool — pass `{resource}_id` to fetch one.
+- MMP status + reset share one tool — `action='status'|'reset'`.
+- Post and amend share one tool — pass `*_id` to switch to PUT/replace.
+- Cancel is unified per product (single id or batch by filter).
+- Destructive tools (`*_post_order`, `*_post_quote`, `*_create_*`,
+  `*_cancel`, `*_mmp(action='reset')`, `paradigm_kill_switch`) are
+  annotated `destructiveHint=true` so MCP clients prompt for approval.
 
 ## Development
 

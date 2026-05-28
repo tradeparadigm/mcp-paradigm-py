@@ -5,18 +5,36 @@ tool surface to Claude Code / Claude Desktop / any MCP-aware client.
 
 ## Product coverage
 
-| Product | Status | REST host | Path prefix | Covered |
+| Product | Status | REST host | Path prefix | Tools |
 |---|---|---|---|---|
-| **DRFQv2** — bilateral RFQ | active | `api.{prod\|testnet}.paradigm.trade` | `/v2/drfq/` | ✓ 22 tools |
-| **OBv1** — Unified Markets order books | active | `api.{prod\|testnet}.paradigm.trade` | `/v1/ob/` | ✓ 23 tools |
-| **FSPD** — Future Spread Direct | active | `api.fs.{prod\|testnet}.paradigm.co` | `/v1/fs/` | ✓ 19 tools |
-| **Firm** — identity / positions / leaderboard | active | `api.{prod\|testnet}.paradigm.trade` | `/v1/identity/`, `/v1/positions/`, `/v1/leaderboard/` | ✓ 7 tools |
+| **DRFQv2** — bilateral RFQ | active | `api.{prod\|testnet}.paradigm.trade` | `/v2/drfq/` | 11 |
+| **OBv1** — Unified Markets order books | active | `api.{prod\|testnet}.paradigm.trade` | `/v1/ob/` | 10 |
+| **FSPD** — Future Spread Direct | active | `api.fs.{prod\|testnet}.paradigm.co` | `/v1/fs/` | 10 |
+| **Firm** (cross-product) | active | `api.{prod\|testnet}.paradigm.trade` | `/v1/identity/`, `/v1/positions/`, `/v1/leaderboard/` | 4 |
+| **Workflow** (cross-product composites) | n/a | — | — | 4 |
 | **GRFQ** — Global RFQ | being deprecated (→ OBv1) | — | `/v1/grfq/` | skip |
 | **VRFQ** — Vanilla RFQ (Ribbon-style) | niche / contact-only | — | `/v1/vrfq/` | not planned |
 
-OBv1 and the firm-level surfaces share the same host as DRFQv2, so
-they reuse `get_paradigm_client()`. FSPD lives on its own host and
-uses `get_fspd_client()`.
+**39 tools total.** OBv1 and firm-level surfaces share the DRFQv2 host
+(reuse `get_paradigm_client()`); FSPD lives on its own host and uses
+`get_fspd_client()`.
+
+### Tool consolidation principles
+
+- **One list/single tool per resource** — pass `{resource}_id` to fetch
+  one; omit for paginated list with filters. (No separate `_get_by_id`
+  tools.)
+- **One action-flag tool for status/reset pairs** — `paradigm_*_mmp`
+  takes `action='status'|'reset'`.
+- **Post/update merged** — `paradigm_*_post_order` and
+  `paradigm_*_post_quote` take an optional `*_id` that switches to
+  PUT/replace.
+- **Cancel unified per product** — one `paradigm_*_cancel` per
+  product, with `target` or single-id vs batch semantics.
+- **Workflow composites** — `paradigm_desk_overview` (10+ calls),
+  `paradigm_kill_switch` (3 calls), `paradigm_drfqv2_rfq_snapshot`
+  (3 calls), `paradigm_obv1_market_snapshot` (3 calls). These replace
+  most of the orchestration an agent would otherwise do.
 
 ---
 

@@ -1,4 +1,4 @@
-"""FastMCP server entry point for Paradigm DRFQv2."""
+"""FastMCP server entry point for the Paradigm trading platform."""
 
 from __future__ import annotations
 
@@ -24,27 +24,37 @@ def create_server() -> FastMCP:
     """Build the FastMCP server instance with description and metadata."""
     return FastMCP(
         name=config.SERVER_NAME,
-        instructions=f"""Paradigm DRFQv2 MCP Server v{__version__}.
+        instructions=f"""Paradigm MCP Server v{__version__} — DRFQv2, OBv1, FSPD.
 
-Wraps the Paradigm bilateral RFQ REST surface. Outbound requests are
-HMAC-signed by the configured Signer (env-key for dev; Vault Transit
-or AWS KMS in prod). Tools are grouped by responsibility:
+Workflow tools are the recommended entry points. Per-product tools
+are kept for granular control.
 
-• Reference  — paradigm_instruments, paradigm_instrument,
-               paradigm_counterparties, paradigm_platform_state
-• RFQs       — paradigm_rfqs, paradigm_rfq, paradigm_rfq_bbo,
-               paradigm_rfq_orders, paradigm_create_rfq (gated),
-               paradigm_cancel_rfq
-• Orders     — paradigm_orders, paradigm_order, paradigm_post_order
-               (gated), paradigm_update_order (gated),
-               paradigm_cancel_order, paradigm_cancel_orders_batch
-• Trades     — paradigm_trades, paradigm_trade, paradigm_trade_tape
-• Pricing    — paradigm_price_legs
-• MMP        — paradigm_mmp_status, paradigm_mmp_reset (gated)
-• Self-test  — paradigm_echo (round-trip to verify signing + auth)
+Start with:
+• paradigm_echo                       — verify signing is wired up
+• paradigm_desk_overview              — positions, MMP, platform state across all products
+• paradigm_drfqv2_rfq_snapshot(id)    — full DRFQv2 RFQ state in one call
+• paradigm_obv1_market_snapshot(id)   — full OBv1 market state in one call
+• paradigm_kill_switch                — cancel everything across all products (destructive)
 
-Start with paradigm_echo to confirm signing is wired up. Then
-paradigm_platform_state for operational status.""",
+Per-product (DRFQv2 bilateral RFQ): paradigm_drfqv2_{{rfqs, orders,
+post_order, cancel, trades, instruments, counterparties, price_legs,
+mmp, create_rfq}}.
+
+Per-product (OBv1 order books): paradigm_obv1_{{obs, create_ob,
+quotes, post_quote, cancel, orders, trades, instruments, price_legs,
+mmp}}.
+
+Per-product (FSPD future spreads): paradigm_fspd_{{instruments,
+strategies, orderbook, orders, post_order, cancel, trades, venues,
+system, mmp}}.
+
+Firm-level (cross-product): paradigm_identity_credentials,
+paradigm_positions, paradigm_leaderboard, paradigm_leaderboard_preferences.
+
+Conventions: list-and-single are merged (pass `*_id` to fetch one);
+MMP status+reset are merged (`action` param); post/replace and
+post/update are merged (pass the id to amend). Tools annotated
+destructive prompt for user approval in MCP clients.""",
     )
 
 

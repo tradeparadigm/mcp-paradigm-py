@@ -11,6 +11,7 @@ from mcp_paradigm.server.server import server
 from mcp_paradigm.utils.paradigm_client import get_paradigm_client
 
 Venue = Literal["BIT", "BYB", "DBT", "PRDX"]
+LeaderboardMetric = Literal["trade_volume", "liquidity_fills", "liquidity_responses"]
 
 
 @server.tool(
@@ -41,10 +42,16 @@ async def paradigm_identity_credentials(
 async def paradigm_positions(
     venue: Annotated[str | None, Field(description="Filter by venue.")] = None,
     product_code: Annotated[str | None, Field(description="Filter by product code.")] = None,
-    account_name: Annotated[str | None, Field(description="Filter by API account name.")] = None,
+    account_name: Annotated[str | None, Field(description="Filter by API account.")] = None,
+    refresh: Annotated[
+        bool,
+        Field(description="If true, trigger an async refresh of the positions cache first."),
+    ] = False,
 ) -> Any:
-    """All positions for the trading desk across venues."""
+    """Desk positions across venues. Set ``refresh=True`` to force re-fetch."""
     client = await get_paradigm_client()
+    if refresh:
+        await client.post("/v1/positions/refresh/", json_body={})
     return await client.get(
         "/v1/positions/",
         venue=venue,
@@ -54,53 +61,15 @@ async def paradigm_positions(
 
 
 @server.tool(
-    name="paradigm_positions_refresh",
-    title="Positions Refresh",
-    annotations=ToolAnnotations(destructiveHint=False, idempotentHint=True),
-)
-async def paradigm_positions_refresh() -> dict[str, Any]:
-    """Trigger an async refresh of the desk's positions cache. Returns 202."""
-    client = await get_paradigm_client()
-    await client.post("/v1/positions/refresh/", json_body={})
-    return {"refresh_triggered": True}
-
-
-@server.tool(
-    name="paradigm_leaderboard_trade_volume",
-    title="Leaderboard: Trade Volume",
+    name="paradigm_leaderboard",
+    title="Leaderboard",
     annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
 )
-async def paradigm_leaderboard_trade_volume(
-    currencies: Annotated[str | None, Field(description="Comma-separated currencies.")] = None,
-    venues: Annotated[str | None, Field(description="Comma-separated venues.")] = None,
-    instrument_kinds: Annotated[
-        str | None, Field(description="Comma-separated instrument kinds.")
-    ] = None,
-    protocols: Annotated[
-        str | None, Field(description="Comma-separated protocols (D1, OB, RFQ).")
-    ] = None,
-    start: Annotated[float | None, Field(description="Start time (unix ms).")] = None,
-    end: Annotated[float | None, Field(description="End time (unix ms).")] = None,
-) -> Any:
-    """Cross-firm trade volume leaderboard."""
-    client = await get_paradigm_client()
-    return await client.get(
-        "/v1/leaderboard/trade_volume/",
-        currencies=currencies,
-        venues=venues,
-        instrument_kinds=instrument_kinds,
-        protocols=protocols,
-        start=start,
-        end=end,
-    )
-
-
-@server.tool(
-    name="paradigm_leaderboard_liquidity_fills",
-    title="Leaderboard: Liquidity Fills",
-    annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
-)
-async def paradigm_leaderboard_liquidity_fills(
+async def paradigm_leaderboard(
+    metric: Annotated[
+        LeaderboardMetric,
+        Field(description="trade_volume | liquidity_fills | liquidity_responses."),
+    ],
     currencies: Annotated[str | None, Field(description="Comma-separated currencies.")] = None,
     venues: Annotated[str | None, Field(description="Comma-separated venues.")] = None,
     instrument_kinds: Annotated[
@@ -113,61 +82,38 @@ async def paradigm_leaderboard_liquidity_fills(
     start: Annotated[float | None, Field(description="Start time (unix ms).")] = None,
     end: Annotated[float | None, Field(description="End time (unix ms).")] = None,
 ) -> Any:
-    """Liquidity fills leaderboard — quote rate, fill rate, spread rank."""
+    """Cross-firm leaderboard for trade volume or liquidity quality."""
     client = await get_paradigm_client()
-    return await client.get(
-        "/v1/leaderboard/liquidity/fills",
-        currencies=currencies,
-        venues=venues,
-        instrument_kinds=instrument_kinds,
-        protocols=protocols,
-        strategies=strategies,
-        start=start,
-        end=end,
-    )
+    path = {
+        "trade_volume": "/v1/leaderboard/trade_volume/",
+        "liquidity_fills": "/v1/leaderboard/liquidity/fills",
+        "liquidity_responses": "/v1/leaderboard/liquidity/responses",
+    }[metric]
+    params: dict[str, Any] = {
+        "currencies": currencies,
+        "venues": venues,
+        "instrument_kinds": instrument_kinds,
+        "protocols": protocols,
+        "start": start,
+        "end": end,
+    }
+    if metric != "trade_volume":
+        params["strategies"] = strategies
+    return await client.get(path, **params)
 
 
 @server.tool(
-    name="paradigm_leaderboard_liquidity_responses",
-    title="Leaderboard: Liquidity Responses",
-    annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
-)
-async def paradigm_leaderboard_liquidity_responses(
-    currencies: Annotated[str | None, Field(description="Comma-separated currencies.")] = None,
-    venues: Annotated[str | None, Field(description="Comma-separated venues.")] = None,
-    instrument_kinds: Annotated[
-        str | None, Field(description="Comma-separated instrument kinds.")
-    ] = None,
-    protocols: Annotated[str | None, Field(description="Comma-separated protocols.")] = None,
-    strategies: Annotated[str | None, Field(description="Comma-separated strategies.")] = None,
-    start: Annotated[float | None, Field(description="Start time (unix ms).")] = None,
-    end: Annotated[float | None, Field(description="End time (unix ms).")] = None,
-) -> Any:
-    """Liquidity response leaderboard — response-time buckets and quote rate."""
-    client = await get_paradigm_client()
-    return await client.get(
-        "/v1/leaderboard/liquidity/responses",
-        currencies=currencies,
-        venues=venues,
-        instrument_kinds=instrument_kinds,
-        protocols=protocols,
-        strategies=strategies,
-        start=start,
-        end=end,
-    )
-
-
-@server.tool(
-    name="paradigm_leaderboard_set_preferences",
-    title="Leaderboard: Set Preferences",
+    name="paradigm_leaderboard_preferences",
+    title="Leaderboard Anonymity",
     annotations=ToolAnnotations(destructiveHint=False, idempotentHint=True),
 )
-async def paradigm_leaderboard_set_preferences(
+async def paradigm_leaderboard_preferences(
     disabled_leaderboard_anonymity: Annotated[
-        bool, Field(description="True to show firm name on leaderboards; False for anonymous.")
+        bool,
+        Field(description="True to show firm name on leaderboards; False for anonymous."),
     ],
 ) -> Any:
-    """Create or update the firm's leaderboard anonymity preference."""
+    """Set the firm's leaderboard anonymity preference."""
     client = await get_paradigm_client()
     return await client.put(
         "/v1/leaderboard/preferences/",
