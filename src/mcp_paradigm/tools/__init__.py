@@ -12,15 +12,10 @@ Consolidation principles:
 """
 
 from . import (
+    drfqv2,
     echo,
     firm,
     fspd,
-    mmp,
     obv1,
-    orders,
-    pricing,
-    reference_data,
-    rfqs,
-    trades,
     workflow,
 )
