@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 from typing import Annotated, Any
 
+import httpx
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
@@ -35,13 +36,13 @@ async def _safe(coro: Any, timeout: float = 8.0) -> Any:
           "path": "/v2/drfq/orders/",
           "request_id": "...",
           "body": {...},
-          "message": "Paradigm API 422 on POST /v2/drfq/orders/ | ...",
-          "hint": "Inspect the `data` field for per-field errors..."
+          "message": "422 POST /v2/drfq/orders/ | validation_failed: ... | hint: ...",
+          "hint": "Read `data` for per-field errors..."
         }
     """
     try:
         return await asyncio.wait_for(coro, timeout=timeout)
-    except TimeoutError:
+    except (TimeoutError, httpx.TimeoutException):
         return _envelope(
             "TimeoutError",
             f"timeout after {timeout}s",
@@ -49,8 +50,16 @@ async def _safe(coro: Any, timeout: float = 8.0) -> Any:
         )
     except ParadigmAPIError as exc:
         return exc.to_dict()
+    except httpx.HTTPError as exc:
+        # Connection refused, DNS failure, TLS error, etc. — httpx exceptions
+        # often stringify empty, so include the class name for visibility.
+        return _envelope(
+            type(exc).__name__,
+            f"{type(exc).__name__}: {exc!s}" if str(exc) else type(exc).__name__,
+            "Network-level failure reaching Paradigm — verify PARADIGM_BASE_URL / PARADIGM_FSPD_BASE_URL and outbound connectivity.",
+        )
     except Exception as exc:  # pragma: no cover
-        return _envelope(type(exc).__name__, str(exc), None)
+        return _envelope(type(exc).__name__, str(exc) or type(exc).__name__, None)
 
 
 def _envelope(error_type: str, message: str, hint: str | None) -> dict[str, Any]:
@@ -136,6 +145,11 @@ async def paradigm_kill_switch(
     RFQs/OBs you created stay open — only your active orders and quotes
     are pulled.
     """
+    if not (drfqv2 or obv1 or fspd):
+        raise ValueError(
+            "paradigm_kill_switch: no products selected (drfqv2/obv1/fspd all False). "
+            "Pass at least one product=True; defaults are True for all three."
+        )
     drfq = await get_paradigm_client()
     fspd_client = await get_fspd_client()
 

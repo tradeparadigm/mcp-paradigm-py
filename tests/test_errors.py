@@ -143,6 +143,32 @@ def test_raise_for_status_noop_on_2xx() -> None:
         raise_for_status(status, None)  # should not raise
 
 
+def test_empty_dict_body_omitted_from_message() -> None:
+    """A 5xx with `{}` body shouldn't emit a literal `{}` in the message."""
+    exc = ParadigmAPIError(500, {}, method="GET", path="/v2/drfq/echo/")
+    msg = str(exc)
+    assert "{}" not in msg
+    assert msg.startswith("500 GET /v2/drfq/echo/")
+
+
+def test_detail_field_surfaced_alongside_error() -> None:
+    """When the API returns both `error` and `detail` (different info),
+    both reach the agent — `or` semantics dropped `detail`."""
+    body = {"error": "auth_failed", "detail": "Bearer token expired at 2026-05-28T12:00Z"}
+    exc = ParadigmAuthError(401, body)
+    msg = str(exc)
+    assert "auth_failed" in msg
+    assert "Bearer token expired" in msg
+
+
+def test_duplicate_error_message_detail_not_repeated() -> None:
+    """If `error` and `message` carry the same string, surface once."""
+    body = {"error": "rate_limit", "message": "rate_limit"}
+    exc = ParadigmAPIError(429, body)
+    msg = str(exc)
+    assert msg.count("rate_limit") == 1
+
+
 def test_long_body_truncated_in_message() -> None:
     body = {"data": {"k": "x" * 5000}}
     exc = ParadigmValidationError(422, body)

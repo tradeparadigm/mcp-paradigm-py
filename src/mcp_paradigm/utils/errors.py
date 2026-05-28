@@ -71,7 +71,7 @@ class ParadigmAPIError(Exception):
 
     def _summarize_body(self) -> str:
         body = self.body
-        if body is None or body == "":
+        if body is None or body == "" or body == {} or body == []:
             return ""
         if not isinstance(body, dict):
             return _truncate(repr(body), _BODY_PREVIEW_MAX)
@@ -82,14 +82,18 @@ class ParadigmAPIError(Exception):
         return head or tail or _truncate(repr(body), _BODY_PREVIEW_MAX)
 
     def _summarize_dict_head(self, body: dict[str, Any]) -> str:
-        """Compact `error: message` (and `code=...` if not redundant)."""
+        """Compact `error: message: detail` (and `code=...` if not redundant)."""
         parts: list[str] = []
-        err = body.get("error") or body.get("detail")
-        if err:
-            parts.append(str(err))
-        message = body.get("message")
-        if message and message != err:
-            parts.append(str(message))
+        seen: set[str] = set()
+        for key in ("error", "message", "detail"):
+            value = body.get(key)
+            if value in (None, ""):
+                continue
+            text = str(value)
+            if text in seen:
+                continue  # don't repeat the same string under two keys
+            seen.add(text)
+            parts.append(text)
         code = body.get("code")
         if code and code != self.status_code:
             parts.append(f"code={code}")
