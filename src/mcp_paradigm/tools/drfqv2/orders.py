@@ -37,7 +37,7 @@ async def paradigm_drfqv2_orders(
         str | None,
         Field(description="If set, fetches the single order; otherwise list with filters."),
     ] = None,
-    rfq_id: Annotated[float | None, Field(description="Filter by RFQ id.")] = None,
+    rfq_id: Annotated[str | None, Field(description="Filter by RFQ id.")] = None,
     state: Annotated[OrderState | None, Field(description="Filter by state.")] = None,
     venue: Annotated[Venue | None, Field(description="Filter by venue.")] = None,
     currency: Annotated[Currency | None, Field(description="Quote currency filter.")] = None,

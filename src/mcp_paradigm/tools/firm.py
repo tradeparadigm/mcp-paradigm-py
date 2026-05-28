@@ -43,21 +43,38 @@ async def paradigm_positions(
     venue: Annotated[str | None, Field(description="Filter by venue.")] = None,
     product_code: Annotated[str | None, Field(description="Filter by product code.")] = None,
     account_name: Annotated[str | None, Field(description="Filter by API account.")] = None,
-    refresh: Annotated[
-        bool,
-        Field(description="If true, trigger an async refresh of the positions cache first."),
-    ] = False,
 ) -> Any:
-    """Desk positions across venues. Set ``refresh=True`` to force re-fetch."""
+    """Desk positions across venues.
+
+    Returns the server-side cached snapshot. If you need fresh data,
+    call ``paradigm_positions_refresh`` first and poll this tool — the
+    refresh is async on the server side, so a single GET right after a
+    refresh trigger may still return stale data.
+    """
     client = await get_paradigm_client()
-    if refresh:
-        await client.post("/v1/positions/refresh/", json_body={})
     return await client.get(
         "/v1/positions/",
         venue=venue,
         product_code=product_code,
         account_name=account_name,
     )
+
+
+@server.tool(
+    name="paradigm_positions_refresh",
+    title="Positions Refresh",
+    annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=True),
+)
+async def paradigm_positions_refresh() -> dict[str, Any]:
+    """Trigger an async refresh of the desk's positions cache.
+
+    Fire-and-forget — the server processes the refresh in the background
+    (HTTP 202) and you must poll ``paradigm_positions`` to read the
+    updated snapshot.
+    """
+    client = await get_paradigm_client()
+    await client.post("/v1/positions/refresh/", json_body={})
+    return {"refresh_triggered": True}
 
 
 @server.tool(
@@ -79,8 +96,8 @@ async def paradigm_leaderboard(
         str | None, Field(description="Comma-separated protocols (D1, OB, RFQ).")
     ] = None,
     strategies: Annotated[str | None, Field(description="Comma-separated strategy codes.")] = None,
-    start: Annotated[float | None, Field(description="Start time (unix ms).")] = None,
-    end: Annotated[float | None, Field(description="End time (unix ms).")] = None,
+    start: Annotated[int | None, Field(description="Start time (unix ms).")] = None,
+    end: Annotated[int | None, Field(description="End time (unix ms).")] = None,
 ) -> Any:
     """Cross-firm leaderboard for trade volume or liquidity quality."""
     client = await get_paradigm_client()

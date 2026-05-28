@@ -184,7 +184,11 @@
     },
     {
       "name": "paradigm_positions",
-      "description": "Desk positions across venues. refresh=True forces an async refresh first."
+      "description": "Desk positions across venues (cached snapshot)."
+    },
+    {
+      "name": "paradigm_positions_refresh",
+      "description": "Trigger an async refresh of the positions cache. Fire-and-forget — poll paradigm_positions to read the updated snapshot."
     },
     {
       "name": "paradigm_leaderboard",

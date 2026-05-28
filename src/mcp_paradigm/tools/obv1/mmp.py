@@ -11,10 +11,11 @@ from mcp_paradigm.server.server import server
 from mcp_paradigm.utils.paradigm_client import get_paradigm_client
 
 
+# See drfqv2/mmp.py for the rationale on the destructiveHint annotation.
 @server.tool(
     name="paradigm_obv1_mmp",
     title="OBv1 MMP",
-    annotations=ToolAnnotations(destructiveHint=False, idempotentHint=True),
+    annotations=ToolAnnotations(destructiveHint=True, idempotentHint=True),
 )
 async def paradigm_obv1_mmp(
     action: Annotated[

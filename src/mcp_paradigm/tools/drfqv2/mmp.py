@@ -11,10 +11,14 @@ from mcp_paradigm.server.server import server
 from mcp_paradigm.utils.paradigm_client import get_paradigm_client
 
 
+# NOTE: this tool covers both a read (status) and a destructive
+# write (reset). The annotation is the worst case — clients that gate
+# destructive tools will prompt even on `action='status'` reads. That's
+# the right side to err on for an MMP control surface.
 @server.tool(
     name="paradigm_drfqv2_mmp",
     title="DRFQv2 MMP",
-    annotations=ToolAnnotations(destructiveHint=False, idempotentHint=True),
+    annotations=ToolAnnotations(destructiveHint=True, idempotentHint=True),
 )
 async def paradigm_drfqv2_mmp(
     action: Annotated[

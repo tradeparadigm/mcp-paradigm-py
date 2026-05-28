@@ -18,10 +18,18 @@ from mcp_paradigm.utils.errors import ParadigmAPIError
 from mcp_paradigm.utils.paradigm_client import get_fspd_client, get_paradigm_client
 
 
-async def _safe(coro: Any) -> Any:
-    """Run a coroutine, return its result or ``{'error': str}`` on failure."""
+async def _safe(coro: Any, timeout: float = 8.0) -> Any:
+    """Run a coroutine with a per-call timeout, return its result or a
+    structured ``{'error': ..., 'status_code'?}`` envelope on failure.
+
+    The timeout bounds workflow tools so one slow product doesn't block
+    the rest (``paradigm_desk_overview``'s 9 concurrent calls would
+    otherwise wait for the slowest up to the global request timeout).
+    """
     try:
-        return await coro
+        return await asyncio.wait_for(coro, timeout=timeout)
+    except TimeoutError:
+        return {"error": f"timeout after {timeout}s"}
     except ParadigmAPIError as exc:
         return {"error": str(exc), "status_code": exc.status_code}
     except Exception as exc:  # pragma: no cover
@@ -107,10 +115,11 @@ async def paradigm_kill_switch(
     if fspd:
         tasks["fspd_orders"] = fspd_client.delete("/v1/fs/orders")
 
-    results: dict[str, Any] = {}
-    for name, coro in tasks.items():
-        results[name] = await _safe(coro)
-    return results
+    # Fan out — every second a stuck product holds liquidity is a
+    # second too long. Use a wider timeout than the snapshot tools.
+    names = list(tasks.keys())
+    outcomes = await asyncio.gather(*(_safe(tasks[n], timeout=20.0) for n in names))
+    return dict(zip(names, outcomes, strict=True))
 
 
 @server.tool(

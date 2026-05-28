@@ -36,7 +36,18 @@ async def paradigm_obv1_instruments(
     cursor: Annotated[str | None, Field(description="Pagination cursor.")] = None,
     page_size: Annotated[int | None, Field(description="Page size.", ge=1, le=1000)] = None,
 ) -> Any:
-    """List OBv1 instruments, or fetch one by ``(venue, instrument_name)``."""
+    """List OBv1 instruments, or fetch one by ``(venue, instrument_name)``.
+
+    Pass both ``venue`` and ``instrument_name`` to fetch a single
+    instrument by venue-native name; omit both for a filtered list.
+    Partial input (only one of the pair) is rejected to avoid silently
+    returning the wrong shape.
+    """
+    if (venue is None) != (instrument_name is None):
+        raise ValueError(
+            "paradigm_obv1_instruments: pass BOTH `venue` and `instrument_name` "
+            "to fetch a single instrument, or omit both for a list."
+        )
     client = await get_paradigm_client()
     if venue is not None and instrument_name is not None:
         return await client.get(f"/v1/ob/instruments/{venue}/{instrument_name}/")
