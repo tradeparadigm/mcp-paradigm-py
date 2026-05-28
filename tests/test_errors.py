@@ -24,10 +24,8 @@ from mcp_paradigm.utils.errors import (
 def test_message_includes_status_method_path() -> None:
     exc = ParadigmAPIError(500, {"error": "boom"}, method="GET", path="/v2/drfq/echo/")
     msg = str(exc)
-    assert "500" in msg
-    assert "GET" in msg
-    assert "/v2/drfq/echo/" in msg
-    assert "error='boom'" in msg
+    assert msg.startswith("500 GET /v2/drfq/echo/")
+    assert "boom" in msg
 
 
 def test_message_includes_request_id_when_present() -> None:
@@ -44,17 +42,33 @@ def test_validation_error_extracts_data_field() -> None:
     }
     exc = ParadigmValidationError(422, body, method="POST", path="/v2/drfq/orders/")
     msg = str(exc)
-    assert "422" in msg
-    assert "validation_failed" in msg
+    assert msg.startswith("422 POST /v2/drfq/orders/")
+    assert "validation_failed: Invalid input." in msg
     assert "quantity" in msg
     assert "required" in msg
+    # `code` should be dropped when it matches the HTTP status.
+    assert "code=" not in msg
     assert "hint:" in msg
+
+
+def test_message_is_concise() -> None:
+    """One-line, compact, no redundant labels."""
+    exc = ParadigmValidationError(
+        422,
+        {"error": "validation_failed", "message": "Quantity must be positive."},
+        method="POST",
+        path="/v2/drfq/orders/",
+    )
+    msg = str(exc)
+    # Expected shape (illustrative): "422 POST /v2/drfq/orders/ | validation_failed: Quantity must be positive. | hint: ..."
+    assert msg.count("|") <= 3
+    assert "Paradigm API" not in msg  # no chatty prefix
 
 
 def test_auth_error_has_recovery_hint() -> None:
     exc = ParadigmAuthError(401, {"detail": "Invalid signature"})
     msg = str(exc)
-    assert "401" in msg
+    assert msg.startswith("401")
     assert "PARADIGM_ACCESS_KEY" in msg
     assert "PARADIGM_SIGNING_KEY" in msg
     assert "paradigm_echo" in msg
@@ -63,14 +77,14 @@ def test_auth_error_has_recovery_hint() -> None:
 def test_not_found_hint_suggests_listing() -> None:
     exc = ParadigmNotFoundError(404, None, method="GET", path="/v2/drfq/rfqs/999/")
     msg = str(exc)
-    assert "404" in msg
+    assert msg.startswith("404")
     assert "paradigm_drfqv2_rfqs" in msg
 
 
 def test_rate_limited_hint_mentions_mmp_and_backoff() -> None:
     exc = ParadigmRateLimitedError(429, {"error": "rate_limit"})
     msg = str(exc)
-    assert "429" in msg
+    assert msg.startswith("429")
     assert "MMP" in msg
     assert "back off" in msg.lower()
 
@@ -78,7 +92,7 @@ def test_rate_limited_hint_mentions_mmp_and_backoff() -> None:
 def test_server_error_hint_warns_against_auto_retry_of_writes() -> None:
     exc = ParadigmServerError(503, None)
     msg = str(exc)
-    assert "503" in msg
+    assert msg.startswith("503")
     assert "POST" in msg
     assert "double-fill" in msg
 

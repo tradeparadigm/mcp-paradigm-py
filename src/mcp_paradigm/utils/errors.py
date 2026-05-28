@@ -50,9 +50,10 @@ class ParadigmAPIError(Exception):
         super().__init__(self._format_message())
 
     def _format_message(self) -> str:
-        parts: list[str] = [f"Paradigm API {self.status_code}"]
+        head = str(self.status_code)
         if self.method and self.path:
-            parts.append(f"on {self.method} {self.path}")
+            head = f"{head} {self.method} {self.path}"
+        parts: list[str] = [head]
 
         # Extract structured fields from a dict body in a stable order.
         body_summary = self._summarize_body()
@@ -72,31 +73,40 @@ class ParadigmAPIError(Exception):
         body = self.body
         if body is None or body == "":
             return ""
-        if isinstance(body, dict):
-            fields: list[str] = []
-            for key in ("error", "code", "message", "detail"):
-                value = body.get(key)
-                if value not in (None, ""):
-                    fields.append(f"{key}={value!r}")
-            # `data` is typically a per-field validation map; render compactly.
-            data = body.get("data")
-            if data:
-                rendered = _truncate(repr(data), _BODY_PREVIEW_MAX)
-                fields.append(f"data={rendered}")
-            # Any other keys we haven't surfaced explicitly.
-            extra = {
-                k: v
-                for k, v in body.items()
-                if k not in {"error", "code", "message", "detail", "data"}
-            }
-            if extra:
-                fields.append(f"other={_truncate(repr(extra), _BODY_PREVIEW_MAX)}")
-            if fields:
-                return " ".join(fields)
-            # Fallback: stringify the whole dict (truncated).
-            return f"body={_truncate(repr(body), _BODY_PREVIEW_MAX)}"
-        # Non-dict body (string, list, etc.) — repr and truncate.
-        return f"body={_truncate(repr(body), _BODY_PREVIEW_MAX)}"
+        if not isinstance(body, dict):
+            return _truncate(repr(body), _BODY_PREVIEW_MAX)
+        head = self._summarize_dict_head(body)
+        tail = self._summarize_dict_tail(body)
+        if head and tail:
+            return f"{head} ({tail})"
+        return head or tail or _truncate(repr(body), _BODY_PREVIEW_MAX)
+
+    def _summarize_dict_head(self, body: dict[str, Any]) -> str:
+        """Compact `error: message` (and `code=...` if not redundant)."""
+        parts: list[str] = []
+        err = body.get("error") or body.get("detail")
+        if err:
+            parts.append(str(err))
+        message = body.get("message")
+        if message and message != err:
+            parts.append(str(message))
+        code = body.get("code")
+        if code and code != self.status_code:
+            parts.append(f"code={code}")
+        return ": ".join(parts)
+
+    def _summarize_dict_tail(self, body: dict[str, Any]) -> str:
+        """Validation `data` map and any unrecognized keys."""
+        parts: list[str] = []
+        data = body.get("data")
+        if data:
+            parts.append(f"data={_truncate(repr(data), _BODY_PREVIEW_MAX)}")
+        extra = {
+            k: v for k, v in body.items() if k not in {"error", "code", "message", "detail", "data"}
+        }
+        if extra:
+            parts.append(f"extra={_truncate(repr(extra), _BODY_PREVIEW_MAX)}")
+        return ", ".join(parts)
 
     def _hint(self) -> str | None:
         """Override in subclasses to attach a recovery hint."""
@@ -122,12 +132,8 @@ class ParadigmAuthError(ParadigmAPIError):
 
     def _hint(self) -> str:
         return (
-            "Verify PARADIGM_ACCESS_KEY and PARADIGM_SIGNING_KEY are set "
-            "and refer to the same key pair. PARADIGM_SIGNING_KEY must be "
-            "the base64-encoded HMAC key issued by Paradigm (NOT the hex "
-            "form). Confirm PARADIGM_ENVIRONMENT matches the key's "
-            "environment (prod vs testnet). Run paradigm_echo to verify "
-            "signing end-to-end."
+            "Check PARADIGM_ACCESS_KEY + PARADIGM_SIGNING_KEY (base64) "
+            "and PARADIGM_ENVIRONMENT; call paradigm_echo to verify."
         )
 
 
@@ -135,49 +141,28 @@ class ParadigmNotFoundError(ParadigmAPIError):
     """404 — resource id doesn't exist or isn't visible to the desk."""
 
     def _hint(self) -> str:
-        return (
-            "Verify the id exists and is visible to this desk. RFQs and "
-            "OBs expire; orders/quotes close after fill or cancel. List "
-            "the resource first (e.g. paradigm_drfqv2_rfqs or "
-            "paradigm_obv1_obs) to confirm the id is currently active."
-        )
+        return "List the parent (e.g. paradigm_drfqv2_rfqs) — id may be expired or not yours."
 
 
 class ParadigmValidationError(ParadigmAPIError):
     """400 / 422 — request body or query parameters rejected by the API."""
 
     def _hint(self) -> str:
-        return (
-            "Inspect the `data` field above for per-field error messages. "
-            "Common causes: missing required field, wrong type (e.g. "
-            "passing a number where a decimal string is expected), value "
-            "outside venue limits (min_block_size, min_tick_size), or "
-            "post-only price that crosses the book."
-        )
+        return "Read `data` for per-field errors; prices/quantities must be decimal strings."
 
 
 class ParadigmRateLimitedError(ParadigmAPIError):
     """429 — rate-limited, or Market Maker Protection has fired."""
 
     def _hint(self) -> str:
-        return (
-            "Back off and retry with exponential delay. If MMP fired, the "
-            "desk is paused — call paradigm_drfqv2_mmp / paradigm_obv1_mmp "
-            "/ paradigm_fspd_mmp with action='status' to check, and "
-            "action='reset' to re-arm after investigation."
-        )
+        return "Back off exponentially. If MMP fired, call paradigm_*_mmp(action='status')."
 
 
 class ParadigmServerError(ParadigmAPIError):
     """5xx — server-side failure."""
 
     def _hint(self) -> str:
-        return (
-            "Paradigm-side failure. Idempotent GETs are safe to retry "
-            "with backoff. Do NOT auto-retry POST/PUT/PATCH (order-placing "
-            "calls) — surface to the user; the order may or may not have "
-            "landed and a retry could double-fill."
-        )
+        return "Retry GETs with backoff. Do NOT auto-retry POST/PUT/PATCH (double-fill risk)."
 
 
 def _truncate(s: str, limit: int) -> str:
