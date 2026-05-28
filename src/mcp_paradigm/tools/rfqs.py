@@ -109,7 +109,8 @@ async def paradigm_create_rfq(
         str | None, Field(description="Account to bill (omit for desk default).")
     ] = None,
     label: Annotated[
-        str | None, Field(description="Caller idempotency label, echoed in response.", max_length=128)
+        str | None,
+        Field(description="Caller idempotency label, echoed in response.", max_length=128),
     ] = None,
     state: Annotated[
         Literal["RFQState.OPEN", "RFQState.DRAFT"],

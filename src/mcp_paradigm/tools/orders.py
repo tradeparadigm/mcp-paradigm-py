@@ -15,9 +15,7 @@ OrderState = Literal["OrderState.CLOSED", "OrderState.OPEN", "OrderState.PENDING
 Side = Literal["BUY", "SELL"]
 OrderType = Literal["LIMIT", "HIDDEN"]
 TimeInForce = Literal["FILL_OR_KILL", "GOOD_TILL_CANCELED"]
-Currency = Literal[
-    "AVAX", "BCH", "BTC", "ETH", "SOL", "TONCOIN", "TRX", "USD", "USDC", "XRP"
-]
+Currency = Literal["AVAX", "BCH", "BTC", "ETH", "SOL", "TONCOIN", "TRX", "USD", "USDC", "XRP"]
 
 
 class OrderLeg(BaseModel):
@@ -35,9 +33,7 @@ async def paradigm_orders(
     state: Annotated[OrderState | None, Field(description="Filter by order state.")] = None,
     venue: Annotated[Venue | None, Field(description="Filter by venue.")] = None,
     currency: Annotated[Currency | None, Field(description="Quote currency filter.")] = None,
-    base_currency: Annotated[
-        Currency | None, Field(description="Base currency filter.")
-    ] = None,
+    base_currency: Annotated[Currency | None, Field(description="Base currency filter.")] = None,
     cursor: Annotated[str | None, Field(description="Pagination cursor.")] = None,
     page_size: Annotated[int | None, Field(description="Page size.", ge=1, le=1000)] = None,
 ) -> Any:

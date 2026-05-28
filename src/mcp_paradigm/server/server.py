@@ -53,7 +53,7 @@ server = create_server()
 
 # Register tools. Imports run their module-level decorators which attach
 # tools to the singleton `server`. F401-safe; see tools/__init__.py.
-import mcp_paradigm.tools  # noqa: E402, F401
+import mcp_paradigm.tools
 
 
 def run_cli() -> None:
@@ -94,4 +94,4 @@ def run_cli() -> None:
         sys.exit(1)
 
 
-__all__ = ["server", "run_cli", "create_server"]
+__all__ = ["create_server", "run_cli", "server"]

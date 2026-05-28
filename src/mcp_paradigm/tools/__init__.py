@@ -4,7 +4,7 @@ Importing each submodule runs its decorators and attaches the tools to
 the server singleton in ``mcp_paradigm.server.server``.
 """
 
-from . import (  # noqa: F401
+from . import (
     echo,
     mmp,
     orders,

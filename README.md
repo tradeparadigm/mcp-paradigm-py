@@ -10,10 +10,22 @@ Exposes the Paradigm REST surface as typed tools to any MCP client
 ## Install
 
 ```bash
-uv sync
-# or
-pip install -e .
+# from PyPI
+pip install mcp-paradigm
+
+# or one-shot via uvx (no install)
+uvx mcp-paradigm
+
+# or for local development
+git clone https://github.com/tradeparadigm/mcp-paradigm-py.git
+cd mcp-paradigm-py
+just install-dev
 ```
+
+Claude Desktop users: install the prebuilt `.mcpb` bundle from the
+latest [GitHub release](https://github.com/tradeparadigm/mcp-paradigm-py/releases)
+— double-click to install, then enter your access key + signing key
+when prompted.
 
 ## Configure
 
@@ -86,10 +98,14 @@ approval prompt before execution.
 ## Development
 
 ```bash
-uv run pytest                    # unit tests (no live network)
-uv run ruff check .              # lint
-uv run ruff format .             # format
+just check       # format + lint + test
+just test        # pytest only
+just mcpb        # build .mcpb bundle for Claude Desktop
+just build       # sdist + wheel
+just docker      # docker build
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev loop.
 
 Signing is verified by `tests/test_signing.py` against the canonical
 Paradigm message layout (`<timestamp>\n<METHOD>\n<path-with-query>\n<body>`).

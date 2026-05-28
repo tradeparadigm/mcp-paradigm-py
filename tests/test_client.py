@@ -39,9 +39,7 @@ async def test_client_signs_get(monkeypatch: pytest.MonkeyPatch) -> None:
         access_key="ak_test",
         signer=signer,
     )
-    client._client = httpx.AsyncClient(
-        base_url="https://api.test.paradigm.co", transport=transport
-    )
+    client._client = httpx.AsyncClient(base_url="https://api.test.paradigm.co", transport=transport)
 
     result = await client.get("/v2/drfq/echo/")
     await client.close()
@@ -72,9 +70,7 @@ async def test_client_signs_post_body(monkeypatch: pytest.MonkeyPatch) -> None:
         access_key="ak_test",
         signer=signer,
     )
-    client._client = httpx.AsyncClient(
-        base_url="https://api.test.paradigm.co", transport=transport
-    )
+    client._client = httpx.AsyncClient(base_url="https://api.test.paradigm.co", transport=transport)
 
     await client.post("/v2/drfq/echo/", json_body={"hello": "world"})
     await client.close()

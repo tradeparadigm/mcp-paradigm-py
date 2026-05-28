@@ -51,9 +51,7 @@ class EnvKeySigner:
     def __init__(self, signing_key_b64: str | None = None) -> None:
         key = signing_key_b64 or config.PARADIGM_SIGNING_KEY
         if not key:
-            raise ValueError(
-                "PARADIGM_SIGNING_KEY is not set; cannot use EnvKeySigner."
-            )
+            raise ValueError("PARADIGM_SIGNING_KEY is not set; cannot use EnvKeySigner.")
         self._key = base64.b64decode(key)
 
     def sign(self, method: str, path: str, body_bytes: bytes) -> tuple[str, str]:

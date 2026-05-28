@@ -1,0 +1,37 @@
+# Smithery configuration: https://smithery.ai/docs/config#smitheryyaml
+
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    required: [paradigmAccessKey, paradigmSigningKey]
+    properties:
+      paradigmEnvironment:
+        type: string
+        default: prod
+        description: Paradigm environment — 'prod' or 'testnet'.
+      paradigmAccessKey:
+        type: string
+        description: Bearer access key issued by Paradigm.
+      paradigmSigningKey:
+        type: string
+        description: Base64-encoded HMAC signing key issued by Paradigm.
+      paradigmAccount:
+        type: string
+        description: Optional account name for multi-desk firms.
+  commandFunction:
+    |-
+    (config) => ({
+      command: 'uvx',
+      args: ['mcp-paradigm'],
+      env: {
+        PARADIGM_ENVIRONMENT: config.paradigmEnvironment || 'prod',
+        PARADIGM_ACCESS_KEY: config.paradigmAccessKey,
+        PARADIGM_SIGNING_KEY: config.paradigmSigningKey,
+        ...(config.paradigmAccount ? { PARADIGM_ACCOUNT: config.paradigmAccount } : {})
+      }
+    })
+  exampleConfig:
+    paradigmEnvironment: testnet
+    paradigmAccessKey: ak_test_xxx
+    paradigmSigningKey: c29tZS1iYXNlNjQtc2lnbmluZy1rZXktaGVyZQ==
