@@ -4,7 +4,7 @@ Thanks for your interest in `mcp-paradigm-py`.
 
 ## Setup
 
-Requires Python 3.10+ and [uv](https://docs.astral.sh/uv/) (recommended)
+Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/) (recommended)
 or pip, plus [just](https://just.systems) for the dev commands.
 
 ```bash

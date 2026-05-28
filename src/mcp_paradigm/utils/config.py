@@ -5,7 +5,7 @@ secrets are read at startup; everything else has sensible defaults.
 """
 
 import os
-from enum import Enum
+from enum import StrEnum
 
 from dotenv import load_dotenv
 
@@ -19,7 +19,7 @@ def _sanitize_env(value: str | None) -> str | None:
     return value or None
 
 
-class Environment(str, Enum):
+class Environment(StrEnum):
     TESTNET = "testnet"
     PROD = "prod"
 
