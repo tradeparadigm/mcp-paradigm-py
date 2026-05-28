@@ -1,18 +1,15 @@
-"""Tool modules registered with the FastMCP server.
+"""OBv1 (Order Books, Unified Markets) tool modules.
 
 Importing each submodule runs its decorators and attaches the tools to
 the server singleton in ``mcp_paradigm.server.server``.
 """
 
 from . import (
-    echo,
-    firm,
-    fspd,
+    markets,
     mmp,
-    obv1,
     orders,
     pricing,
-    reference_data,
-    rfqs,
+    quotes,
+    reference,
     trades,
 )

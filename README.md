@@ -4,15 +4,17 @@ MCP server for the **Paradigm** trading platform. Exposes the REST
 surface as typed tools to any MCP client (Claude Code, Claude Desktop,
 any IDE with MCP support).
 
-Covers two active Paradigm products:
+Covers the active Paradigm products:
 
 - **DRFQv2** — bilateral RFQ (request-for-quote)
-- **FSPD** — Future Spread Direct (orderbook-style with full depth,
+- **OBv1** — Unified Markets order books (long-lived multi-counterparty
+  auctions; maker quotes, taker fills, block trades, trade tape)
+- **FSPD** — Future Spread Direct (orderbook for future spreads with
   market/limit orders, post-only, IOC, order replace)
+- **Firm** — identity credentials, positions, cross-firm leaderboards
 
-OBv1 (Unified Markets orderbook, replacing GRFQ) is tracked as a TODO.
-GRFQ and VRFQ are out of scope — GRFQ is being deprecated and VRFQ is
-niche.
+GRFQ is being deprecated in favour of OBv1; VRFQ is niche. Neither is
+covered.
 
 > See [`DESIGN.md`](DESIGN.md) for the full design — tool surface,
 > auth model, signing layer, deployment posture.

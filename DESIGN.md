@@ -7,16 +7,16 @@ tool surface to Claude Code / Claude Desktop / any MCP-aware client.
 
 | Product | Status | REST host | Path prefix | Covered |
 |---|---|---|---|---|
-| **DRFQv2** — bilateral RFQ | active | `api.{prod\|testnet}.paradigm.trade` | `/v2/drfq/` | ✓ 23 tools |
+| **DRFQv2** — bilateral RFQ | active | `api.{prod\|testnet}.paradigm.trade` | `/v2/drfq/` | ✓ 22 tools |
+| **OBv1** — Unified Markets order books | active | `api.{prod\|testnet}.paradigm.trade` | `/v1/ob/` | ✓ 23 tools |
 | **FSPD** — Future Spread Direct | active | `api.fs.{prod\|testnet}.paradigm.co` | `/v1/fs/` | ✓ 19 tools |
-| **OBv1** — Unified Markets orderbook | active | `api.{prod\|testnet}.paradigm.trade` | (TBD) | ✗ planned |
+| **Firm** — identity / positions / leaderboard | active | `api.{prod\|testnet}.paradigm.trade` | `/v1/identity/`, `/v1/positions/`, `/v1/leaderboard/` | ✓ 7 tools |
 | **GRFQ** — Global RFQ | being deprecated (→ OBv1) | — | `/v1/grfq/` | skip |
 | **VRFQ** — Vanilla RFQ (Ribbon-style) | niche / contact-only | — | `/v1/vrfq/` | not planned |
 
-OBv1 (the Unified Markets orderbook product that replaces GRFQ) is
-flagged as a TODO. Adding it follows the same pattern as FSPD: a third
-client base URL, a `tools/obv1/` subpackage, and `paradigm_obv1_*`
-tools.
+OBv1 and the firm-level surfaces share the same host as DRFQv2, so
+they reuse `get_paradigm_client()`. FSPD lives on its own host and
+uses `get_fspd_client()`.
 
 ---
 
@@ -24,8 +24,9 @@ tools.
 
 **Goals:**
 
-1. Expose Paradigm's active product REST surfaces as MCP tools — DRFQv2
-   and FSPD shipped, OBv1 planned.
+1. Expose Paradigm's active product REST surfaces as MCP tools — DRFQv2,
+   OBv1, and FSPD all shipped, plus firm-level identity, positions, and
+   leaderboards.
 2. Keep the HMAC signing key out of the agent process (pluggable
    signing layer: env-var for dev, Vault Transit / AWS KMS for prod).
 3. OAuth 2.1-protected per the MCP spec (2025-03-26 revision), with
