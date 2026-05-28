@@ -3,8 +3,8 @@
   "name": "mcp-paradigm",
   "display_name": "Paradigm DRFQv2",
   "version": "0.1.0",
-  "description": "MCP server for the Paradigm DRFQv2 bilateral RFQ trading platform.",
-  "long_description": "Wraps the Paradigm DRFQv2 REST surface and exposes typed MCP tools for the full bilateral RFQ lifecycle — list and create RFQs, post quotes or crossing orders, manage block trades, reset MMP, and snapshot the trade tape. Authenticated requests are HMAC-signed via a pluggable Signer (env-key for local use; Vault Transit / AWS KMS planned). Order placement, RFQ creation, and MMP reset are annotated destructive so MCP clients can prompt for approval before execution.",
+  "description": "MCP server for the Paradigm trading platform — DRFQv2 bilateral RFQs and FSPD future spreads.",
+  "long_description": "Wraps the Paradigm REST surfaces and exposes typed MCP tools across two products: DRFQv2 (bilateral request-for-quote — list and create RFQs, post quotes or crossing orders, snapshot the trade tape) and FSPD (Future Spread Direct — orderbook-style trading with full depth, market and limit orders with post-only / IOC, order replace, cancel-all by label). Authenticated requests are HMAC-signed via a pluggable Signer (env-key for local use; Vault Transit / AWS KMS planned). Order placement, RFQ creation, and MMP reset are annotated destructive so MCP clients can prompt for approval before execution.",
   "author": {
     "name": "Paradigm",
     "email": "support@paradigm.co",
@@ -32,7 +32,8 @@
         "PARADIGM_ENVIRONMENT": "${user_config.paradigm_environment}",
         "PARADIGM_ACCESS_KEY": "${user_config.paradigm_access_key}",
         "PARADIGM_SIGNING_KEY": "${user_config.paradigm_signing_key}",
-        "PARADIGM_ACCOUNT": "${user_config.paradigm_account}"
+        "PARADIGM_ACCOUNT": "${user_config.paradigm_account}",
+        "PARADIGM_FSPD_BASE_URL": "${user_config.paradigm_fspd_base_url}"
       }
     }
   },
@@ -58,8 +59,27 @@
     {"name": "paradigm_trade", "description": "Fetch a single trade."},
     {"name": "paradigm_trade_tape", "description": "Public anonymized trade tape across the network."},
     {"name": "paradigm_price_legs", "description": "Given strategy bid/ask, return per-leg prices."},
-    {"name": "paradigm_mmp_status", "description": "Current Market Maker Protection status — rate_limit_hit boolean."},
-    {"name": "paradigm_mmp_reset", "description": "Reset the MMP flag to re-arm the desk for quoting. Destructive."}
+    {"name": "paradigm_mmp_status", "description": "DRFQv2 Market Maker Protection status — rate_limit_hit boolean."},
+    {"name": "paradigm_mmp_reset", "description": "Reset the DRFQv2 MMP flag to re-arm the desk for quoting. Destructive."},
+    {"name": "paradigm_fspd_instruments", "description": "List FSPD instruments. Filters: venue, kind, margin_type, state, clearing/settlement currency."},
+    {"name": "paradigm_fspd_strategies", "description": "List tradeable FSPD strategies (future spreads, spot/future structures)."},
+    {"name": "paradigm_fspd_strategy", "description": "Fetch a single FSPD strategy by id, including its legs."},
+    {"name": "paradigm_fspd_orderbook", "description": "Full FSPD orderbook (bids + asks with order_ids) for a strategy."},
+    {"name": "paradigm_fspd_orderbook_summary", "description": "BBO summary for an FSPD strategy: best bid/ask + last trade."},
+    {"name": "paradigm_fspd_orders", "description": "List FSPD orders for the desk. Filters: strategy_id, state, venue, kind, type."},
+    {"name": "paradigm_fspd_order", "description": "Fetch a single FSPD order with its event history."},
+    {"name": "paradigm_fspd_post_order", "description": "Post an FSPD order (LIMIT/MARKET, GTC/IOC, optional post_only). Destructive — puts money on the wire."},
+    {"name": "paradigm_fspd_replace_order", "description": "Replace an existing FSPD order in one call. Destructive."},
+    {"name": "paradigm_fspd_cancel_order", "description": "Cancel a single FSPD order."},
+    {"name": "paradigm_fspd_cancel_all_orders", "description": "Cancel all FSPD orders for the desk, optionally filtered by label."},
+    {"name": "paradigm_fspd_trades", "description": "List FSPD trades for the desk. Filters: strategy, order, venue, role, settlement currency."},
+    {"name": "paradigm_fspd_trade", "description": "Fetch a single FSPD trade with its legs."},
+    {"name": "paradigm_fspd_venues", "description": "Status of all FSPD clearing venues."},
+    {"name": "paradigm_fspd_venue", "description": "Status of a single FSPD venue."},
+    {"name": "paradigm_fspd_system_state", "description": "Operational state of the FSPD system."},
+    {"name": "paradigm_fspd_system_time", "description": "FSPD server time (unix nanoseconds)."},
+    {"name": "paradigm_fspd_mmp_status", "description": "Current FSPD Market Maker Protection status."},
+    {"name": "paradigm_fspd_mmp_reset", "description": "Reset the FSPD MMP flag. Destructive."}
   ],
   "user_config": {
     "paradigm_access_key": {
@@ -87,6 +107,12 @@
       "type": "string",
       "title": "Account (multi-desk)",
       "description": "Optional account name for multi-desk firms — sent as the Paradigm-Account header.",
+      "required": false
+    },
+    "paradigm_fspd_base_url": {
+      "type": "string",
+      "title": "FSPD Base URL Override",
+      "description": "Optional override for the FSPD API base URL. Defaults to api.fspd.paradigm.co (prod) or api.fspd.test.paradigm.co (testnet).",
       "required": false
     }
   },

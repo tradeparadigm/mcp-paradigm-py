@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.tradeparadigm/mcp-paradigm-py",
   "title": "Paradigm DRFQv2",
-  "description": "MCP server for Paradigm DRFQv2 — bilateral RFQ trading. RFQ lifecycle, order placement, block trades, MMP, and the trade tape.",
+  "description": "MCP server for the Paradigm trading platform. Covers DRFQv2 (bilateral RFQ) and FSPD (Future Spread Direct orderbook): RFQ lifecycle, orders, trades, orderbook, MMP, and the trade tape.",
   "repository": {
     "url": "https://github.com/tradeparadigm/mcp-paradigm-py",
     "source": "github"
@@ -42,6 +42,13 @@
         {
           "name": "PARADIGM_ACCOUNT",
           "description": "Optional account name for multi-desk firms (Paradigm-Account header).",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "PARADIGM_FSPD_BASE_URL",
+          "description": "Optional FSPD base URL override. Defaults to api.fs.prod.paradigm.co / api.fs.testnet.paradigm.co.",
           "isRequired": false,
           "isSecret": false,
           "format": "string"

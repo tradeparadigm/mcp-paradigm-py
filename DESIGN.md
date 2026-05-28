@@ -1,9 +1,22 @@
 # `mcp-paradigm-py` — design
 
-The MCP server wraps the Paradigm DRFQv2 REST surface and exposes a
-typed tool surface to Claude Code / Claude Desktop / any MCP-aware
-client. The skill `paradigm-rfq-trader` becomes a thin workflow
-document once these tools exist.
+The MCP server wraps the Paradigm REST surfaces and exposes a typed
+tool surface to Claude Code / Claude Desktop / any MCP-aware client.
+
+## Product coverage
+
+| Product | Status | REST host | Path prefix | Covered |
+|---|---|---|---|---|
+| **DRFQv2** — bilateral RFQ | active | `api.{prod\|testnet}.paradigm.trade` | `/v2/drfq/` | ✓ 23 tools |
+| **FSPD** — Future Spread Direct | active | `api.fs.{prod\|testnet}.paradigm.co` | `/v1/fs/` | ✓ 19 tools |
+| **OBv1** — Unified Markets orderbook | active | `api.{prod\|testnet}.paradigm.trade` | (TBD) | ✗ planned |
+| **GRFQ** — Global RFQ | being deprecated (→ OBv1) | — | `/v1/grfq/` | skip |
+| **VRFQ** — Vanilla RFQ (Ribbon-style) | niche / contact-only | — | `/v1/vrfq/` | not planned |
+
+OBv1 (the Unified Markets orderbook product that replaces GRFQ) is
+flagged as a TODO. Adding it follows the same pattern as FSPD: a third
+client base URL, a `tools/obv1/` subpackage, and `paradigm_obv1_*`
+tools.
 
 ---
 
@@ -11,7 +24,8 @@ document once these tools exist.
 
 **Goals:**
 
-1. Expose the full DRFQv2 REST surface as MCP tools.
+1. Expose Paradigm's active product REST surfaces as MCP tools — DRFQv2
+   and FSPD shipped, OBv1 planned.
 2. Keep the HMAC signing key out of the agent process (pluggable
    signing layer: env-var for dev, Vault Transit / AWS KMS for prod).
 3. OAuth 2.1-protected per the MCP spec (2025-03-26 revision), with
@@ -23,8 +37,8 @@ document once these tools exist.
 
 **Non-goals:**
 
-1. Not a general Paradigm dev tool — only DRFQv2. VRFQ, FSPD, GRFQ are
-   separate concerns.
+1. **GRFQ** is being phased out by OBv1, so it isn't on the roadmap.
+2. **VRFQ** is a niche surface — not planned unless requested.
 2. Not a strategy engine — it executes what the caller decides. Pricing
    logic, edge application, etc. live in the calling skill.
 3. Not a credential vault — it consumes a signing capability, doesn't

@@ -1,8 +1,18 @@
 # mcp-paradigm-py
 
-MCP server for the **Paradigm DRFQv2** bilateral RFQ trading platform.
-Exposes the Paradigm REST surface as typed tools to any MCP client
-(Claude Code, Claude Desktop, any IDE with MCP support).
+MCP server for the **Paradigm** trading platform. Exposes the REST
+surface as typed tools to any MCP client (Claude Code, Claude Desktop,
+any IDE with MCP support).
+
+Covers two active Paradigm products:
+
+- **DRFQv2** — bilateral RFQ (request-for-quote)
+- **FSPD** — Future Spread Direct (orderbook-style with full depth,
+  market/limit orders, post-only, IOC, order replace)
+
+OBv1 (Unified Markets orderbook, replacing GRFQ) is tracked as a TODO.
+GRFQ and VRFQ are out of scope — GRFQ is being deprecated and VRFQ is
+niche.
 
 > See [`DESIGN.md`](DESIGN.md) for the full design — tool surface,
 > auth model, signing layer, deployment posture.
@@ -80,6 +90,8 @@ If signing is broken you'll see a 401 with `Invalid signature`.
 Grouped by responsibility — see DESIGN.md for the full mapping to
 Paradigm REST endpoints, scopes, and approval gates.
 
+### DRFQv2 (bilateral RFQ)
+
 | Group | Tools |
 |---|---|
 | Reference data | `paradigm_instruments`, `paradigm_instrument`, `paradigm_counterparties`, `paradigm_platform_state` |
@@ -90,10 +102,23 @@ Paradigm REST endpoints, scopes, and approval gates.
 | MMP | `paradigm_mmp_status`, `paradigm_mmp_reset` |
 | Self-test | `paradigm_echo` |
 
-Tools that put money on the wire (`paradigm_post_order`,
-`paradigm_update_order`, `paradigm_create_rfq`, `paradigm_mmp_reset`)
-are annotated `destructiveHint=true` so MCP clients can show an
-approval prompt before execution.
+### FSPD (Future Spread Direct)
+
+| Group | Tools |
+|---|---|
+| Reference | `paradigm_fspd_instruments`, `paradigm_fspd_strategies`, `paradigm_fspd_strategy`, `paradigm_fspd_venues`, `paradigm_fspd_venue` |
+| Orderbook | `paradigm_fspd_orderbook`, `paradigm_fspd_orderbook_summary` |
+| Orders | `paradigm_fspd_orders`, `paradigm_fspd_order`, `paradigm_fspd_post_order`, `paradigm_fspd_replace_order`, `paradigm_fspd_cancel_order`, `paradigm_fspd_cancel_all_orders` |
+| Trades | `paradigm_fspd_trades`, `paradigm_fspd_trade` |
+| System | `paradigm_fspd_system_state`, `paradigm_fspd_system_time` |
+| MMP | `paradigm_fspd_mmp_status`, `paradigm_fspd_mmp_reset` |
+
+Tools that put money on the wire — `paradigm_post_order`,
+`paradigm_update_order`, `paradigm_create_rfq`, `paradigm_mmp_reset`,
+`paradigm_fspd_post_order`, `paradigm_fspd_replace_order`,
+`paradigm_fspd_mmp_reset`, and the cancel variants — are annotated
+`destructiveHint=true` so MCP clients can show an approval prompt
+before execution.
 
 ## Development
 

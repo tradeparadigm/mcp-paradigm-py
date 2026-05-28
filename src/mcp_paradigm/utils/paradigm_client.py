@@ -148,11 +148,12 @@ class ParadigmClient:
 
 
 _singleton: ParadigmClient | None = None
+_fspd_singleton: ParadigmClient | None = None
 _lock = asyncio.Lock()
 
 
 async def get_paradigm_client() -> ParadigmClient:
-    """Return the process-wide ``ParadigmClient`` singleton."""
+    """Return the process-wide DRFQv2 client singleton."""
     global _singleton
     if _singleton is not None:
         return _singleton
@@ -160,3 +161,18 @@ async def get_paradigm_client() -> ParadigmClient:
         if _singleton is None:
             _singleton = ParadigmClient()
     return _singleton
+
+
+async def get_fspd_client() -> ParadigmClient:
+    """Return the process-wide FSPD (Future Spread) client singleton.
+
+    Same access key + Signer as the DRFQv2 client, but points at the
+    FSPD API host (``api.fspd.paradigm.co`` / ``api.fspd.test.paradigm.co``).
+    """
+    global _fspd_singleton
+    if _fspd_singleton is not None:
+        return _fspd_singleton
+    async with _lock:
+        if _fspd_singleton is None:
+            _fspd_singleton = ParadigmClient(base_url=config.fspd_base_url())
+    return _fspd_singleton

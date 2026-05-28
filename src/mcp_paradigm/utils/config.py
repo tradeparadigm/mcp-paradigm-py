@@ -24,10 +24,12 @@ class Environment(str, Enum):
     PROD = "prod"
 
 
-_PROD_REST = "https://api.paradigm.co"
-_TEST_REST = "https://api.test.paradigm.co"
-_PROD_WS = "wss://ws.api.paradigm.trade/v2/drfq/"
-_TEST_WS = "wss://ws.api.test.paradigm.trade/v2/drfq/"
+_PROD_REST = "https://api.prod.paradigm.trade"
+_TEST_REST = "https://api.testnet.paradigm.trade"
+_PROD_WS = "wss://ws.api.prod.paradigm.trade/v2/drfq/"
+_TEST_WS = "wss://ws.api.testnet.paradigm.trade/v2/drfq/"
+_PROD_FSPD = "https://api.fs.prod.paradigm.co"
+_TEST_FSPD = "https://api.fs.testnet.paradigm.co"
 
 
 class Config:
@@ -40,6 +42,7 @@ class Config:
 
     PARADIGM_BASE_URL: str | None = _sanitize_env(os.getenv("PARADIGM_BASE_URL"))
     PARADIGM_WS_URL: str | None = _sanitize_env(os.getenv("PARADIGM_WS_URL"))
+    PARADIGM_FSPD_BASE_URL: str | None = _sanitize_env(os.getenv("PARADIGM_FSPD_BASE_URL"))
 
     PARADIGM_ACCESS_KEY: str | None = _sanitize_env(os.getenv("PARADIGM_ACCESS_KEY"))
     PARADIGM_SIGNING_KEY: str | None = _sanitize_env(os.getenv("PARADIGM_SIGNING_KEY"))
@@ -63,6 +66,12 @@ class Config:
         if cls.PARADIGM_WS_URL:
             return cls.PARADIGM_WS_URL
         return _TEST_WS if cls.ENVIRONMENT == Environment.TESTNET else _PROD_WS
+
+    @classmethod
+    def fspd_base_url(cls) -> str:
+        if cls.PARADIGM_FSPD_BASE_URL:
+            return cls.PARADIGM_FSPD_BASE_URL.rstrip("/")
+        return _TEST_FSPD if cls.ENVIRONMENT == Environment.TESTNET else _PROD_FSPD
 
     @classmethod
     def is_configured(cls) -> bool:

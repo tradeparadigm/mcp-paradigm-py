@@ -19,6 +19,9 @@ startCommand:
       paradigmAccount:
         type: string
         description: Optional account name for multi-desk firms.
+      paradigmFspdBaseUrl:
+        type: string
+        description: Optional FSPD base URL override.
   commandFunction:
     |-
     (config) => ({
@@ -28,7 +31,8 @@ startCommand:
         PARADIGM_ENVIRONMENT: config.paradigmEnvironment || 'prod',
         PARADIGM_ACCESS_KEY: config.paradigmAccessKey,
         PARADIGM_SIGNING_KEY: config.paradigmSigningKey,
-        ...(config.paradigmAccount ? { PARADIGM_ACCOUNT: config.paradigmAccount } : {})
+        ...(config.paradigmAccount ? { PARADIGM_ACCOUNT: config.paradigmAccount } : {}),
+        ...(config.paradigmFspdBaseUrl ? { PARADIGM_FSPD_BASE_URL: config.paradigmFspdBaseUrl } : {})
       }
     })
   exampleConfig:
