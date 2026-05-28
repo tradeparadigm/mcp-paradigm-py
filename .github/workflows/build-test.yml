@@ -23,10 +23,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
 
-      - name: Install dependencies
-        run: |
-          uv pip install --system build hatchling
-          uv pip install --system -e ".[dev]"
+      - name: Sync dependencies
+        run: uv sync --all-extras
 
       - name: Format check
         run: uv run ruff format --check src tests
