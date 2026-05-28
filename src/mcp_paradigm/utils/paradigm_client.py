@@ -118,8 +118,22 @@ class ParadigmClient:
             headers=headers,
         )
 
+        # Paradigm includes a request id in the response headers; surface
+        # it in any error so support / on-call can correlate quickly.
+        request_id = (
+            response.headers.get("x-request-id")
+            or response.headers.get("x-paradigm-request-id")
+            or response.headers.get("request-id")
+        )
+
         if response.status_code == 204 or not response.content:
-            raise_for_status(response.status_code, None)
+            raise_for_status(
+                response.status_code,
+                None,
+                method=method,
+                path=signed_path,
+                request_id=request_id,
+            )
             return None
 
         try:
@@ -127,7 +141,13 @@ class ParadigmClient:
         except ValueError:
             body = response.text
 
-        raise_for_status(response.status_code, body)
+        raise_for_status(
+            response.status_code,
+            body,
+            method=method,
+            path=signed_path,
+            request_id=request_id,
+        )
         return body
 
     # Convenience wrappers

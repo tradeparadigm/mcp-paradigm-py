@@ -20,20 +20,37 @@ from mcp_paradigm.utils.paradigm_client import get_fspd_client, get_paradigm_cli
 
 async def _safe(coro: Any, timeout: float = 8.0) -> Any:
     """Run a coroutine with a per-call timeout, return its result or a
-    structured ``{'error': ..., 'status_code'?}`` envelope on failure.
+    structured error envelope on failure.
 
     The timeout bounds workflow tools so one slow product doesn't block
-    the rest (``paradigm_desk_overview``'s 9 concurrent calls would
-    otherwise wait for the slowest up to the global request timeout).
+    the rest (``paradigm_desk_overview``'s gathered calls would otherwise
+    wait for the slowest up to the global request timeout).
+
+    Error envelope shape (from ``ParadigmAPIError.to_dict``)::
+
+        {
+          "error_type": "ParadigmValidationError",
+          "status_code": 422,
+          "method": "POST",
+          "path": "/v2/drfq/orders/",
+          "request_id": "...",
+          "body": {...},
+          "message": "Paradigm API 422 on POST /v2/drfq/orders/ | ...",
+          "hint": "Inspect the `data` field for per-field errors..."
+        }
     """
     try:
         return await asyncio.wait_for(coro, timeout=timeout)
     except TimeoutError:
-        return {"error": f"timeout after {timeout}s"}
+        return {
+            "error_type": "TimeoutError",
+            "message": f"timeout after {timeout}s",
+            "hint": "The Paradigm endpoint did not respond within the workflow tool's per-call budget. The product may be degraded — call its tools directly to confirm.",
+        }
     except ParadigmAPIError as exc:
-        return {"error": str(exc), "status_code": exc.status_code}
+        return exc.to_dict()
     except Exception as exc:  # pragma: no cover
-        return {"error": str(exc)}
+        return {"error_type": type(exc).__name__, "message": str(exc)}
 
 
 @server.tool(
