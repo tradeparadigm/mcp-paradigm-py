@@ -39,24 +39,24 @@ async def paradigm_obv1_instruments(
     """List OBv1 instruments, or fetch one by ``(venue, instrument_name)``.
 
     Pass both ``venue`` and ``instrument_name`` to fetch a single
-    instrument by venue-native name; omit both for a filtered list.
-    Partial input (only one of the pair) is rejected to avoid silently
-    returning the wrong shape.
+    instrument by venue-native name. Either one alone is fine as a
+    list filter — ``venue`` filters by clearing venue, ``instrument_name``
+    is forwarded as the ``name`` filter on the list endpoint.
     """
-    if (venue is None) != (instrument_name is None):
-        raise ValueError(
-            "paradigm_obv1_instruments: pass BOTH `venue` and `instrument_name` "
-            "to fetch a single instrument, or omit both for a list."
-        )
     client = await get_paradigm_client()
+    # Singleton lookup requires both parts of the (venue, name) pair.
     if venue is not None and instrument_name is not None:
         return await client.get(f"/v1/ob/instruments/{venue}/{instrument_name}/")
+    # `instrument_name` provided alone → treat as a list filter via `name`.
+    name_filter = name
+    if instrument_name is not None and not name_filter:
+        name_filter = [instrument_name]
     return await client.get(
         "/v1/ob/instruments/",
         venue=venue,
         asset=asset,
         kind=kind,
-        name=name,
+        name=name_filter,
         cursor=cursor,
         page_size=page_size,
     )

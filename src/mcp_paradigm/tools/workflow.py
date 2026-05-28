@@ -42,15 +42,30 @@ async def _safe(coro: Any, timeout: float = 8.0) -> Any:
     try:
         return await asyncio.wait_for(coro, timeout=timeout)
     except TimeoutError:
-        return {
-            "error_type": "TimeoutError",
-            "message": f"timeout after {timeout}s",
-            "hint": "The Paradigm endpoint did not respond within the workflow tool's per-call budget. The product may be degraded — call its tools directly to confirm.",
-        }
+        return _envelope(
+            "TimeoutError",
+            f"timeout after {timeout}s",
+            "The endpoint exceeded the workflow tool's per-call budget — call the per-product tool directly to confirm whether it's degraded.",
+        )
     except ParadigmAPIError as exc:
         return exc.to_dict()
     except Exception as exc:  # pragma: no cover
-        return {"error_type": type(exc).__name__, "message": str(exc)}
+        return _envelope(type(exc).__name__, str(exc), None)
+
+
+def _envelope(error_type: str, message: str, hint: str | None) -> dict[str, Any]:
+    """Same shape as ``ParadigmAPIError.to_dict`` so the agent sees one
+    error envelope regardless of which failure mode tripped."""
+    return {
+        "error_type": error_type,
+        "status_code": None,
+        "method": None,
+        "path": None,
+        "request_id": None,
+        "body": None,
+        "message": message,
+        "hint": hint,
+    }
 
 
 @server.tool(

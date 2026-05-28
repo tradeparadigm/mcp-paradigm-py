@@ -148,7 +148,7 @@
     },
     {
       "name": "paradigm_fspd_orderbook",
-      "description": "FSPD orderbook \u2014 BBO summary by default, full depth if full=True."
+      "description": "FSPD orderbook \u2014 full asks/bids depth by default, BBO summary if summary=True."
     },
     {
       "name": "paradigm_fspd_orders",

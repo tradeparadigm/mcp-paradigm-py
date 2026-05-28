@@ -26,7 +26,10 @@ async def paradigm_fspd_mmp(
     """FSPD MMP status, or reset to re-arm the desk."""
     client = await get_fspd_client()
     if action == "reset":
-        # Mirror the shape of DRFQv2/OBv1 reset payloads.
-        await client.patch("/v1/fs/mmp/status", json_body={"rate_limit_hit": False})
-        return {"rate_limit_hit": False, "reset": True}
+        # FSPD's PATCH /v1/fs/mmp/status takes no request body (spec has
+        # no requestBody schema, unlike DRFQv2/OBv1 which accept
+        # PatchedMarketMakerProtectionStatus). Sending an unexpected
+        # field can be rejected by strict validators.
+        await client.patch("/v1/fs/mmp/status", json_body={})
+        return {"reset": True}
     return await client.get("/v1/fs/mmp/status")
