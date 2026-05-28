@@ -1,0 +1,72 @@
+"""Configuration for the MCP Paradigm server.
+
+Loads from environment variables (and `.env` via python-dotenv). All
+secrets are read at startup; everything else has sensible defaults.
+"""
+
+import os
+from enum import Enum
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+def _sanitize_env(value: str | None) -> str | None:
+    """Return None for unsubstituted template variables like ${user_config.foo}."""
+    if value and value.startswith("${") and value.endswith("}"):
+        return None
+    return value or None
+
+
+class Environment(str, Enum):
+    TESTNET = "testnet"
+    PROD = "prod"
+
+
+_PROD_REST = "https://api.paradigm.co"
+_TEST_REST = "https://api.test.paradigm.co"
+_PROD_WS = "wss://ws.api.paradigm.trade/v2/drfq/"
+_TEST_WS = "wss://ws.api.test.paradigm.trade/v2/drfq/"
+
+
+class Config:
+    """Runtime configuration for the MCP Paradigm server."""
+
+    SERVER_NAME: str = os.getenv("SERVER_NAME", "Paradigm DRFQv2")
+    SERVER_PORT: int = int(os.getenv("SERVER_PORT", "3000"))
+
+    ENVIRONMENT: str = os.getenv("PARADIGM_ENVIRONMENT", "prod")
+
+    PARADIGM_BASE_URL: str | None = _sanitize_env(os.getenv("PARADIGM_BASE_URL"))
+    PARADIGM_WS_URL: str | None = _sanitize_env(os.getenv("PARADIGM_WS_URL"))
+
+    PARADIGM_ACCESS_KEY: str | None = _sanitize_env(os.getenv("PARADIGM_ACCESS_KEY"))
+    PARADIGM_SIGNING_KEY: str | None = _sanitize_env(os.getenv("PARADIGM_SIGNING_KEY"))
+    PARADIGM_ACCOUNT: str | None = _sanitize_env(os.getenv("PARADIGM_ACCOUNT"))
+
+    SIGNING_DRIVER: str = os.getenv("PARADIGM_SIGNING_DRIVER", "env_key")
+
+    REQUEST_TIMEOUT_SECONDS: float = float(os.getenv("PARADIGM_TIMEOUT", "30"))
+
+    WS_BUFFER_MAX_EVENTS: int = int(os.getenv("PARADIGM_WS_BUFFER", "1000"))
+    WS_BUFFER_TTL_SECONDS: int = int(os.getenv("PARADIGM_WS_TTL", "600"))
+
+    @classmethod
+    def base_url(cls) -> str:
+        if cls.PARADIGM_BASE_URL:
+            return cls.PARADIGM_BASE_URL.rstrip("/")
+        return _TEST_REST if cls.ENVIRONMENT == Environment.TESTNET else _PROD_REST
+
+    @classmethod
+    def ws_url(cls) -> str:
+        if cls.PARADIGM_WS_URL:
+            return cls.PARADIGM_WS_URL
+        return _TEST_WS if cls.ENVIRONMENT == Environment.TESTNET else _PROD_WS
+
+    @classmethod
+    def is_configured(cls) -> bool:
+        return bool(cls.PARADIGM_ACCESS_KEY and cls.PARADIGM_SIGNING_KEY)
+
+
+config = Config()
