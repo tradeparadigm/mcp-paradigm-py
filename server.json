@@ -1,0 +1,73 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.tradeparadigm/mcp-paradigm-py",
+  "title": "Paradigm DRFQv2",
+  "description": "MCP server for the Paradigm trading platform. Covers DRFQv2 (bilateral RFQ) and FSPD (Future Spread Direct orderbook): RFQ lifecycle, orders, trades, orderbook, MMP, and the trade tape.",
+  "repository": {
+    "url": "https://github.com/tradeparadigm/mcp-paradigm-py",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "mcp-paradigm",
+      "version": "0.1.0",
+      "transport": [
+        {"type": "stdio"},
+        {"type": "streamableHttp", "path": "/mcp"}
+      ],
+      "environmentVariables": [
+        {
+          "name": "PARADIGM_ACCESS_KEY",
+          "description": "Bearer access key issued by Paradigm.",
+          "isRequired": true,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "PARADIGM_SIGNING_KEY",
+          "description": "Base64-encoded HMAC signing key issued by Paradigm.",
+          "isRequired": true,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "PARADIGM_ENVIRONMENT",
+          "description": "Paradigm environment — 'prod' (default) or 'testnet'.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "PARADIGM_ACCOUNT",
+          "description": "Optional account name for multi-desk firms (Paradigm-Account header).",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "PARADIGM_FSPD_BASE_URL",
+          "description": "Optional FSPD base URL override. Defaults to api.fs.prod.paradigm.co / api.fs.testnet.paradigm.co.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "MCP_TRANSPORT",
+          "description": "Transport — 'stdio' (default) or 'streamable-http'.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "MCP_PORT",
+          "description": "Port for streamable-http transport. Defaults to 3000.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

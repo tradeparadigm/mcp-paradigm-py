@@ -1,0 +1,88 @@
+name: Publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  publish-pypi:
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write  # required for PyPI Trusted Publishing (OIDC)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Build package
+        run: uv build
+
+      - name: Check package
+        run: uvx twine check dist/*
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          print-hash: true
+
+  build-mcpb:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # upload release assets
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build MCPB bundle
+        run: npx --yes @anthropic-ai/mcpb pack .
+
+      - name: Upload MCPB to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "*.mcpb"
+
+      - name: Upload MCPB as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcpb-bundle
+          path: "*.mcpb"
+
+  test-install:
+    needs: publish-pypi
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Installing version: ${VERSION}"
+
+      - name: Wait for PyPI propagation
+        run: sleep 120
+
+      - name: Install from PyPI
+        run: pip install "mcp-paradigm==${{ steps.version.outputs.version }}"
+
+      - name: Smoke test
+        run: |
+          python -c "import mcp_paradigm; print(f'installed {mcp_paradigm.__version__}')"
+          mcp-paradigm --help

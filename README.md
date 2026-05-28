@@ -1,0 +1,146 @@
+# mcp-paradigm-py
+
+MCP server for the **Paradigm** trading platform. Exposes the REST
+surface as typed tools to any MCP client (Claude Code, Claude Desktop,
+any IDE with MCP support).
+
+Covers the active Paradigm products:
+
+- **DRFQv2** — bilateral RFQ (request-for-quote)
+- **OBv1** — Unified Markets order books (long-lived multi-counterparty
+  auctions; maker quotes, taker fills, block trades, trade tape)
+- **FSPD** — Future Spread Direct (orderbook for future spreads with
+  market/limit orders, post-only, IOC, order replace)
+- **Firm** — identity credentials, positions, cross-firm leaderboards
+
+GRFQ is being deprecated in favour of OBv1; VRFQ is niche. Neither is
+covered.
+
+> See [`DESIGN.md`](DESIGN.md) for the full design — tool surface,
+> auth model, signing layer, deployment posture.
+
+## Install
+
+```bash
+# from PyPI
+pip install mcp-paradigm
+
+# or one-shot via uvx (no install)
+uvx mcp-paradigm
+
+# or for local development
+git clone https://github.com/tradeparadigm/mcp-paradigm-py.git
+cd mcp-paradigm-py
+just install-dev
+```
+
+Claude Desktop users: install the prebuilt `.mcpb` bundle from the
+latest [GitHub release](https://github.com/tradeparadigm/mcp-paradigm-py/releases)
+— double-click to install, then enter your access key + signing key
+when prompted.
+
+## Configure
+
+Set your Paradigm access key and signing key. The signing key is
+base64-encoded as issued by Paradigm.
+
+```bash
+export PARADIGM_ACCESS_KEY="..."         # bearer token (access key id)
+export PARADIGM_SIGNING_KEY="..."        # base64-encoded HMAC key
+export PARADIGM_ENVIRONMENT="testnet"    # or "prod"
+# Optional overrides:
+# export PARADIGM_BASE_URL="https://api.test.paradigm.co"
+# export PARADIGM_WS_URL="wss://ws.api.test.paradigm.trade/v2/drfq/"
+# export PARADIGM_ACCOUNT="my-desk"      # if running multi-desk
+```
+
+## Run
+
+```bash
+# stdio transport — for Claude Desktop / Claude Code
+mcp-paradigm
+
+# streamable-http — for remote agents
+mcp-paradigm --transport streamable-http --port 3000
+```
+
+### Wiring into Claude Code / Desktop
+
+```json
+{
+  "mcpServers": {
+    "paradigm": {
+      "command": "mcp-paradigm",
+      "env": {
+        "PARADIGM_ACCESS_KEY": "...",
+        "PARADIGM_SIGNING_KEY": "...",
+        "PARADIGM_ENVIRONMENT": "testnet"
+      }
+    }
+  }
+}
+```
+
+## Smoke test
+
+After wiring up the server, call `paradigm_echo` first. A 200 response
+confirms your access key, signing key, and environment are all correct.
+If signing is broken you'll see a 401 with `Invalid signature`.
+
+## Tool surface
+
+39 tools, workflow-oriented. Full mapping in [DESIGN.md](DESIGN.md).
+
+### Start here
+
+| Tool | What it does |
+|---|---|
+| `paradigm_echo` | Signing self-test — first call after wiring. |
+| `paradigm_desk_overview` | Positions + MMP + platform state across all products in one call. |
+| `paradigm_drfqv2_rfq_snapshot(rfq_id)` | RFQ + BBO + order book for a DRFQv2 RFQ. |
+| `paradigm_obv1_market_snapshot(ob_id)` | OB + BBO + quotes book for an OBv1 market. |
+| `paradigm_kill_switch` | Cancel all orders/quotes across all products. **Destructive.** |
+
+### Per-product (granular)
+
+| Product | Tools |
+|---|---|
+| DRFQv2 | `paradigm_drfqv2_{rfqs, create_rfq, orders, post_order, cancel, trades, instruments, counterparties, price_legs, mmp}` |
+| OBv1 | `paradigm_obv1_{obs, create_ob, quotes, post_quote, cancel, orders, trades, instruments, price_legs, mmp}` |
+| FSPD | `paradigm_fspd_{instruments, strategies, orderbook, orders, post_order, cancel, trades, venues, system, mmp}` |
+| Firm | `paradigm_identity_credentials`, `paradigm_positions`, `paradigm_leaderboard`, `paradigm_leaderboard_preferences` |
+
+### Conventions
+
+- List and single-fetch share one tool — pass `{resource}_id` to fetch one.
+- MMP status + reset share one tool — `action='status'|'reset'`.
+- Post and amend share one tool — pass `*_id` to switch to PUT/replace.
+- Cancel is unified per product (single id or batch by filter).
+- Destructive tools (`*_post_order`, `*_post_quote`, `*_create_*`,
+  `*_cancel`, `*_mmp(action='reset')`, `paradigm_kill_switch`) are
+  annotated `destructiveHint=true` so MCP clients prompt for approval.
+
+## Development
+
+```bash
+just check       # format + lint + test
+just test        # pytest only
+just mcpb        # build .mcpb bundle for Claude Desktop
+just build       # sdist + wheel
+just docker      # docker build
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev loop.
+
+Signing is verified by `tests/test_signing.py` against the canonical
+Paradigm message layout (`<timestamp>\n<METHOD>\n<path-with-query>\n<body>`).
+
+## Status
+
+Alpha. The REST surface is complete; WebSocket subscription tools
+(`paradigm_subscribe` / `paradigm_poll` / `paradigm_unsubscribe`) and
+production signers (Vault Transit, AWS KMS) are tracked in DESIGN.md.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
