@@ -11,8 +11,8 @@ from mcp_paradigm.server.server import server
 from mcp_paradigm.utils.paradigm_client import get_paradigm_client
 
 Venue = Literal["BIT", "BYB", "DBT", "PRDX", "RBN", "TTN", "BLT", "FBX", "FKN", "FTX", "SKD", "CME"]
-RFQState = Literal["RFQState.OPEN", "RFQState.CLOSED", "RFQState.DRAFT"]
-Role = Literal["AuctionRole.MAKER", "AuctionRole.TAKER"]
+RFQState = Literal["OPEN", "CLOSED", "DRAFT"]
+Role = Literal["MAKER", "TAKER"]
 Side = Literal["BUY", "SELL"]
 
 
@@ -78,9 +78,9 @@ async def paradigm_drfqv2_create_rfq(
         Field(description="Caller idempotency label, echoed in response.", max_length=128),
     ] = None,
     state: Annotated[
-        Literal["RFQState.OPEN", "RFQState.DRAFT"],
+        Literal["OPEN", "DRAFT"],
         Field(description="OPEN sends now; DRAFT stages without notifying counterparties."),
-    ] = "RFQState.OPEN",
+    ] = "OPEN",
 ) -> Any:
     """Create a new DRFQv2 RFQ to the chosen counterparties.
 

@@ -15,7 +15,7 @@ from mcp_paradigm.server.server import server
 from mcp_paradigm.utils.paradigm_client import get_paradigm_client
 
 Venue = Literal["BIT", "BYB", "DBT", "PRDX"]
-OrderState = Literal["OrderState.CLOSED", "OrderState.OPEN", "OrderState.PENDING"]
+OrderState = Literal["OPEN", "CLOSED", "PENDING"]
 Side = Literal["BUY", "SELL"]
 OrderType = Literal["LIMIT", "HIDDEN"]
 TimeInForce = Literal["FILL_OR_KILL", "GOOD_TILL_CANCELED"]
