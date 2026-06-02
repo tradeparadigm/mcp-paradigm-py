@@ -7,12 +7,12 @@
     "url": "https://github.com/tradeparadigm/mcp-paradigm-py",
     "source": "github"
   },
-  "version": "0.1.2",
+  "version": "0.1.3",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "mcp-paradigm",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "transport": [
         {"type": "stdio"},
         {"type": "streamableHttp", "path": "/mcp"}

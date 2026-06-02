@@ -101,3 +101,36 @@ jobs:
         run: |
           python -c "import mcp_paradigm; print(f'installed {mcp_paradigm.__version__}')"
           mcp-paradigm --help
+
+  publish-registry:
+    needs: test-install  # ensure the PyPI release is live before registering it
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # required for MCP Registry GitHub OIDC auth (no secrets)
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Verify server.json version matches release tag
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          SERVER_VERSION="$(jq -r '.version' server.json)"
+          PACKAGE_VERSION="$(jq -r '.packages[0].version' server.json)"
+          echo "tag=${TAG_VERSION} server.json=${SERVER_VERSION} package=${PACKAGE_VERSION}"
+          if [ "$SERVER_VERSION" != "$TAG_VERSION" ] || [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::server.json version(s) (${SERVER_VERSION}/${PACKAGE_VERSION}) do not match release tag ${TAG_VERSION}. Bump server.json before tagging."
+            exit 1
+          fi
+
+      - name: Install mcp-publisher
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/v1.7.9/mcp-publisher_linux_amd64.tar.gz" \
+            | tar xz mcp-publisher
+          chmod +x mcp-publisher
+
+      - name: Publish to MCP Registry
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
