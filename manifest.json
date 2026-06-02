@@ -2,7 +2,7 @@
   "manifest_version": "0.4",
   "name": "mcp-paradigm",
   "display_name": "Paradigm",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MCP server for the Paradigm trading platform \u2014 DRFQv2 RFQs, OBv1 order books, FSPD future spreads, plus identity, positions, and leaderboards.",
   "long_description": "Wraps the Paradigm REST surfaces and exposes typed MCP tools across three active products: DRFQv2 (bilateral request-for-quote), OBv1 (Unified Markets order books \u2014 long-lived multi-counterparty auctions with maker quotes and taker fills), and FSPD (Future Spread Direct \u2014 orderbook for future spreads with limit/market orders, post-only/IOC, replace, cancel-all). Also covers firm-level identity credentials, positions, and the cross-firm trade-volume and liquidity leaderboards. Authenticated requests are HMAC-signed via a pluggable Signer (env-key for local; Vault Transit / AWS KMS planned). Order placement, quoting, market creation, and MMP reset are annotated destructive so MCP clients can prompt for approval.",
   "author": {
