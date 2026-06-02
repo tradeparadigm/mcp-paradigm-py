@@ -1,5 +1,7 @@
 # mcp-paradigm-py
 
+<!-- mcp-name: io.github.tradeparadigm/mcp-paradigm-py -->
+
 MCP server for the **Paradigm** trading platform. Exposes the REST
 surface as typed tools to any MCP client (Claude Code, Claude Desktop,
 any IDE with MCP support).

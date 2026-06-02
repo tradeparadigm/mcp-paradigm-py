@@ -11,16 +11,18 @@ jobs:
     environment: release
     permissions:
       contents: read
-      id-token: write  # required for PyPI Trusted Publishing (OIDC)
+      id-token: write  # required for PyPI Trusted Publishing (OIDC) + provenance
+      attestations: write  # required to write build provenance attestations
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.13"
           enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
 
       - name: Build package
         run: uv build
@@ -28,37 +30,50 @@ jobs:
       - name: Check package
         run: uvx twine check dist/*
 
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: "dist/*"
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           print-hash: true
+          attestations: true  # generate & upload PEP 740 attestations to PyPI
 
   build-mcpb:
     runs-on: ubuntu-latest
     permissions:
       contents: write  # upload release assets
+      id-token: write  # required for provenance attestations
+      attestations: write  # required to write build provenance attestations
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Build MCPB bundle
         run: npx --yes @anthropic-ai/mcpb pack .
 
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: "*.mcpb"
+
       - name: Upload MCPB to release
         if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: "*.mcpb"
 
       - name: Upload MCPB as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mcpb-bundle
           path: "*.mcpb"
@@ -86,3 +101,36 @@ jobs:
         run: |
           python -c "import mcp_paradigm; print(f'installed {mcp_paradigm.__version__}')"
           mcp-paradigm --help
+
+  publish-registry:
+    needs: test-install  # ensure the PyPI release is live before registering it
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # required for MCP Registry GitHub OIDC auth (no secrets)
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Verify server.json version matches release tag
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          SERVER_VERSION="$(jq -r '.version' server.json)"
+          PACKAGE_VERSION="$(jq -r '.packages[0].version' server.json)"
+          echo "tag=${TAG_VERSION} server.json=${SERVER_VERSION} package=${PACKAGE_VERSION}"
+          if [ "$SERVER_VERSION" != "$TAG_VERSION" ] || [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::server.json version(s) (${SERVER_VERSION}/${PACKAGE_VERSION}) do not match release tag ${TAG_VERSION}. Bump server.json before tagging."
+            exit 1
+          fi
+
+      - name: Install mcp-publisher
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/v1.7.9/mcp-publisher_linux_amd64.tar.gz" \
+            | tar xz mcp-publisher
+          chmod +x mcp-publisher
+
+      - name: Publish to MCP Registry
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
