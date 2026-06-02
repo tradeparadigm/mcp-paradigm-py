@@ -172,6 +172,9 @@ channels are reference-counted so the underlying subscribe/unsubscribe
 is sent once regardless of how many logical subscriptions are open. The
 connection signs its handshake with the same `Signer` as REST and sends
 a heartbeat every 5s (Paradigm closes idle-heartbeat sockets after 10s).
+On a silent drop the reader flags the connection down (`poll` reports
+`connected: false`); the next `subscribe` reconnects and re-sends the
+subscribe frames for every still-live channel.
 
 | Tool | Behavior |
 |---|---|

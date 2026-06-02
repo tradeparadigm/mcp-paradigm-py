@@ -90,6 +90,7 @@ class WSManager:
         self._buffer_ttl = buffer_ttl or config.WS_BUFFER_TTL_SECONDS
 
         self._conn: WSConnection | None = None
+        self._connected = False
         self._reader: asyncio.Task[None] | None = None
         self._heartbeat: asyncio.Task[None] | None = None
         self._lock = asyncio.Lock()
@@ -128,15 +129,35 @@ class WSManager:
         }
 
     async def _ensure_connection(self) -> None:
-        if self._conn is not None:
+        """Open the connection if needed — reconnecting after a silent drop.
+
+        A dropped socket leaves ``_connected`` False with live channel
+        refs; in that case we open a fresh connection and re-send the
+        subscribe frames for every channel that still has subscribers so
+        existing ``subscription_id``s keep receiving events.
+        """
+        if self._conn is not None and self._connected:
             return
+        resubscribe = bool(self._channel_refs)
+        await self._close_connection()
         url = self._connect_url()
         logger.info("opening DRFQv2 WebSocket connection")
-        self._conn = await self._connect_fn(url, self._handshake_headers())
-        self._reader = asyncio.create_task(self._read_loop())
+        conn = await self._connect_fn(url, self._handshake_headers())
+        self._conn = conn
+        self._connected = True
+        self._reader = asyncio.create_task(self._read_loop(conn))
         self._heartbeat = asyncio.create_task(self._heartbeat_loop())
+        if resubscribe:
+            for channel in list(self._channel_refs):
+                await self._send_subscribe(channel)
 
-    async def _teardown(self) -> None:
+    async def _close_connection(self) -> None:
+        """Tear down the socket + background tasks, keeping subs/buffer.
+
+        Used both for a full teardown (last unsubscribe) and to discard a
+        stale connection before reconnecting.
+        """
+        self._connected = False
         for task in (self._reader, self._heartbeat):
             if task is not None:
                 task.cancel()
@@ -147,6 +168,9 @@ class WSManager:
                 await self._conn.close()
         self._conn = None
 
+    async def _teardown(self) -> None:
+        await self._close_connection()
+
     async def _next_rpc_id(self) -> int:
         self._rpc_id += 1
         return self._rpc_id
@@ -154,6 +178,26 @@ class WSManager:
     async def _send(self, payload: dict[str, Any]) -> None:
         assert self._conn is not None
         await self._conn.send(json.dumps(payload))
+
+    async def _send_subscribe(self, channel: str) -> None:
+        await self._send(
+            {
+                "id": await self._next_rpc_id(),
+                "jsonrpc": "2.0",
+                "method": "subscribe",
+                "params": {"channel": channel},
+            }
+        )
+
+    async def _send_unsubscribe(self, channel: str) -> None:
+        await self._send(
+            {
+                "id": await self._next_rpc_id(),
+                "jsonrpc": "2.0",
+                "method": "unsubscribe",
+                "params": {"channel": channel},
+            }
+        )
 
     # -- background loops -----------------------------------------------------
 
@@ -166,11 +210,10 @@ class WSManager:
                 )
             except Exception as exc:  # pragma: no cover - connection dropped
                 logger.warning("heartbeat failed, WebSocket likely dropped: %s", exc)
+                self._connected = False
                 return
 
-    async def _read_loop(self) -> None:
-        conn = self._conn
-        assert conn is not None
+    async def _read_loop(self, conn: WSConnection) -> None:
         try:
             while True:
                 raw = await conn.recv()
@@ -179,6 +222,12 @@ class WSManager:
             raise
         except Exception as exc:  # pragma: no cover - connection dropped
             logger.warning("WebSocket read loop ended: %s", exc)
+        finally:
+            # Flag the drop so the next subscribe reconnects — but only if
+            # this is still the live connection (not a deliberate teardown
+            # that already swapped in a new socket).
+            if conn is self._conn:
+                self._connected = False
 
     def _ingest(self, raw: str | bytes) -> None:
         try:
@@ -220,22 +269,14 @@ class WSManager:
         if channel not in CHANNELS:
             raise ValueError(f"unknown channel {channel!r}; valid channels: {', '.join(CHANNELS)}")
         async with self._lock:
-            first_ever = self._conn is None
-            if first_ever:
+            if not self._channel_refs:
                 # cancel_on_disconnect is a connection-level setting; it can
                 # only be chosen by the subscribe that opens the socket.
                 self._cancel_on_disconnect = cancel_on_disconnect
             await self._ensure_connection()
 
             if self._channel_refs.get(channel, 0) == 0:
-                await self._send(
-                    {
-                        "id": await self._next_rpc_id(),
-                        "jsonrpc": "2.0",
-                        "method": "subscribe",
-                        "params": {"channel": channel},
-                    }
-                )
+                await self._send_subscribe(channel)
             self._channel_refs[channel] = self._channel_refs.get(channel, 0) + 1
 
             sub_id = uuid.uuid4().hex
@@ -276,7 +317,7 @@ class WSManager:
             "channel": channel,
             "events": events,
             "cursor": cursor,
-            "connected": self._conn is not None,
+            "connected": self._connected,
         }
 
     async def unsubscribe(self, subscription_id: str) -> dict[str, Any]:
@@ -288,16 +329,9 @@ class WSManager:
             remaining = self._channel_refs.get(channel, 0) - 1
             if remaining <= 0:
                 self._channel_refs.pop(channel, None)
-                if self._conn is not None:
+                if self._conn is not None and self._connected:
                     try:
-                        await self._send(
-                            {
-                                "id": await self._next_rpc_id(),
-                                "jsonrpc": "2.0",
-                                "method": "unsubscribe",
-                                "params": {"channel": channel},
-                            }
-                        )
+                        await self._send_unsubscribe(channel)
                     except Exception as exc:  # pragma: no cover - already dropped
                         logger.warning("unsubscribe send failed: %s", exc)
             else:

@@ -198,3 +198,52 @@ async def test_cancel_on_disconnect_propagates_to_url() -> None:
 
 def test_channels_constant_matches_documented_set() -> None:
     assert CHANNELS == ("rfq", "order", "bbo", "trade", "trade_confirmation", "mmp")
+
+
+class _DroppingConn(_FakeConn):
+    """A fake whose recv() raises once the fed queue drains, simulating a drop."""
+
+    async def recv(self) -> str:
+        if self._queue.empty():
+            raise ConnectionError("socket dropped")
+        return await self._queue.get()
+
+
+@pytest.mark.asyncio
+async def test_silent_drop_marks_disconnected_and_reconnects() -> None:
+    conns: list[_FakeConn] = []
+
+    async def connect_fn(url: str, headers: dict[str, str]) -> _FakeConn:
+        # First socket drops on first recv; the reconnect gets a healthy
+        # socket whose recv() blocks (stays connected).
+        conn: _FakeConn = _DroppingConn() if not conns else _FakeConn()
+        conns.append(conn)
+        return conn
+
+    mgr = WSManager(
+        connect_fn=connect_fn,
+        signer=_FakeSigner(),
+        ws_url="wss://ws.example/v2/drfq/",
+        access_key="ak_test",
+    )
+
+    sub = await mgr.subscribe("rfq")
+    await _drain()  # let the first conn's recv() drain → ConnectionError → drop
+
+    # poll surfaces the drop honestly rather than reporting connected.
+    out = await mgr.poll(sub["subscription_id"])
+    assert out["connected"] is False
+
+    # Subscribing again reconnects on a fresh socket and re-sends the
+    # subscribe frame for the still-live channel.
+    sub2 = await mgr.subscribe("rfq")
+    assert len(conns) == 2
+    assert "subscribe" in conns[1].methods()
+    resub = next(f for f in conns[1].sent if f.get("method") == "subscribe")
+    assert resub["params"] == {"channel": "rfq"}
+
+    again = await mgr.poll(sub["subscription_id"])
+    assert again["connected"] is True
+
+    await mgr.unsubscribe(sub["subscription_id"])
+    await mgr.unsubscribe(sub2["subscription_id"])
