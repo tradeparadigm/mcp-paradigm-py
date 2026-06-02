@@ -62,19 +62,117 @@ async def paradigm_drfqv2_instruments(
     )
 
 
+def _desk_supports_venue(desk: Any, venue: str) -> bool:
+    """True if a counterparty desk lists ``venue`` among the venues it trades.
+
+    Each desk carries a ``venues`` field; it may be a list of bare venue
+    codes (``["PRDX", "DBT"]``) or a list of objects keyed by ``name`` /
+    ``venue`` / ``code``. Match case-insensitively across both shapes.
+    """
+    if not isinstance(desk, dict):
+        return False
+    venues = desk.get("venues")
+    if not isinstance(venues, list):
+        return False
+    target = venue.upper()
+    for entry in venues:
+        if isinstance(entry, str):
+            name: Any = entry
+        elif isinstance(entry, dict):
+            name = entry.get("name") or entry.get("venue") or entry.get("code")
+        else:
+            name = None
+        if name is not None and str(name).upper() == target:
+            return True
+    return False
+
+
+def _list_items(resp: Any) -> list[Any]:
+    """Pull the list of records out of a Paradigm list response envelope."""
+    if isinstance(resp, list):
+        return resp
+    if isinstance(resp, dict):
+        for key in ("results", "data", "counterparties"):
+            value = resp.get(key)
+            if isinstance(value, list):
+                return value
+    return []
+
+
+def _next_cursor(resp: Any) -> str | None:
+    """Pull the next-page cursor token out of a list response, if any."""
+    if not isinstance(resp, dict):
+        return None
+    for key in ("next", "next_cursor", "cursor"):
+        value = resp.get(key)
+        # DRF-style `next` is a full URL we can't reuse as a cursor; only
+        # follow opaque cursor tokens.
+        if isinstance(value, str) and value and "://" not in value:
+            return value
+    return None
+
+
 @server.tool(
     name="paradigm_drfqv2_counterparties",
     title="DRFQv2 Counterparties",
     annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
 )
 async def paradigm_drfqv2_counterparties(
+    venue: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Filter to desks that support this settlement venue "
+                "(e.g. 'PRDX', 'DBT'). When set, every page is scanned "
+                "and only matching desks are returned, so the result is "
+                "the complete set of LPs reachable for that venue."
+            )
+        ),
+    ] = None,
     cursor: Annotated[str | None, Field(description="Pagination cursor.")] = None,
     page_size: Annotated[int | None, Field(description="Page size.", ge=1, le=1000)] = None,
 ) -> Any:
-    """List desks the firm can RFQ — desk_name, firm_name, groups, venues."""
+    """List counterparty desks the firm can RFQ.
+
+    Each desk exposes ``desk_name``, ``firm_name``, ``groups``, and
+    ``venues`` — the settlement venues that desk can trade. Use the
+    ``venues`` field (or the ``venue`` filter) to resolve which LPs can
+    quote a given venue before calling ``paradigm_drfqv2_create_rfq``;
+    a desk that doesn't list a venue can't be quoted there.
+
+    Without ``venue`` this returns one page (honouring ``cursor`` /
+    ``page_size``). With ``venue`` set it pages through every desk and
+    returns the full filtered set as
+    ``{"results": [...], "count": N, "venue": ..., "scanned": M}`` —
+    so "all LPs that support PRDX" is precisely resolvable in one call.
+    """
     client = await get_paradigm_client()
-    return await client.get(
-        "/v2/drfq/counterparties/",
-        cursor=cursor,
-        page_size=page_size,
-    )
+    if venue is None:
+        return await client.get(
+            "/v2/drfq/counterparties/",
+            cursor=cursor,
+            page_size=page_size,
+        )
+
+    matched: list[Any] = []
+    scanned = 0
+    page_cursor = cursor
+    # Bound the walk so a misbehaving cursor can never loop forever.
+    for _ in range(100):
+        resp = await client.get(
+            "/v2/drfq/counterparties/",
+            cursor=page_cursor,
+            page_size=page_size,
+        )
+        items = _list_items(resp)
+        scanned += len(items)
+        matched.extend(d for d in items if _desk_supports_venue(d, venue))
+        page_cursor = _next_cursor(resp)
+        if not page_cursor:
+            break
+    return {
+        "results": matched,
+        "count": len(matched),
+        "venue": venue,
+        "scanned": scanned,
+    }

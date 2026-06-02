@@ -40,6 +40,10 @@ Per-product (DRFQv2 bilateral RFQ): paradigm_drfqv2_{{rfqs, orders,
 post_order, cancel, trades, instruments, counterparties, price_legs,
 mmp, create_rfq}}.
 
+Live data (DRFQv2 WebSocket): paradigm_subscribe(channel) →
+paradigm_poll(subscription_id) → paradigm_unsubscribe. Channels: rfq,
+order, bbo, trade, trade_confirmation, mmp. Use instead of REST polling.
+
 Per-product (OBv1 order books): paradigm_obv1_{{obs, create_ob,
 quotes, post_quote, cancel, orders, trades, instruments, price_legs,
 mmp}}.
