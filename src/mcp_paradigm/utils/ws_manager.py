@@ -149,7 +149,7 @@ class WSManager:
         self._heartbeat = asyncio.create_task(self._heartbeat_loop())
         if resubscribe:
             for channel in list(self._channel_refs):
-                await self._send_subscribe(channel)
+                await self._send_rpc("subscribe", {"channel": channel})
 
     async def _close_connection(self) -> None:
         """Tear down the socket + background tasks, keeping subs/buffer.
@@ -168,9 +168,6 @@ class WSManager:
                 await self._conn.close()
         self._conn = None
 
-    async def _teardown(self) -> None:
-        await self._close_connection()
-
     async def _next_rpc_id(self) -> int:
         self._rpc_id += 1
         return self._rpc_id
@@ -179,25 +176,16 @@ class WSManager:
         assert self._conn is not None
         await self._conn.send(json.dumps(payload))
 
-    async def _send_subscribe(self, channel: str) -> None:
-        await self._send(
-            {
-                "id": await self._next_rpc_id(),
-                "jsonrpc": "2.0",
-                "method": "subscribe",
-                "params": {"channel": channel},
-            }
-        )
-
-    async def _send_unsubscribe(self, channel: str) -> None:
-        await self._send(
-            {
-                "id": await self._next_rpc_id(),
-                "jsonrpc": "2.0",
-                "method": "unsubscribe",
-                "params": {"channel": channel},
-            }
-        )
+    async def _send_rpc(self, method: str, params: dict[str, Any] | None = None) -> None:
+        """Send a JSON-RPC request frame with an auto-incrementing id."""
+        frame: dict[str, Any] = {
+            "id": await self._next_rpc_id(),
+            "jsonrpc": "2.0",
+            "method": method,
+        }
+        if params is not None:
+            frame["params"] = params
+        await self._send(frame)
 
     # -- background loops -----------------------------------------------------
 
@@ -205,9 +193,7 @@ class WSManager:
         while True:
             await asyncio.sleep(_HEARTBEAT_INTERVAL_SECONDS)
             try:
-                await self._send(
-                    {"id": await self._next_rpc_id(), "jsonrpc": "2.0", "method": "heartbeat"}
-                )
+                await self._send_rpc("heartbeat")
             except Exception as exc:  # pragma: no cover - connection dropped
                 logger.warning("heartbeat failed, WebSocket likely dropped: %s", exc)
                 self._connected = False
@@ -275,9 +261,10 @@ class WSManager:
                 self._cancel_on_disconnect = cancel_on_disconnect
             await self._ensure_connection()
 
-            if self._channel_refs.get(channel, 0) == 0:
-                await self._send_subscribe(channel)
-            self._channel_refs[channel] = self._channel_refs.get(channel, 0) + 1
+            refs = self._channel_refs.get(channel, 0)
+            if refs == 0:
+                await self._send_rpc("subscribe", {"channel": channel})
+            self._channel_refs[channel] = refs + 1
 
             sub_id = uuid.uuid4().hex
             self._subs[sub_id] = {
@@ -331,7 +318,7 @@ class WSManager:
                 self._channel_refs.pop(channel, None)
                 if self._conn is not None and self._connected:
                     try:
-                        await self._send_unsubscribe(channel)
+                        await self._send_rpc("unsubscribe", {"channel": channel})
                     except Exception as exc:  # pragma: no cover - already dropped
                         logger.warning("unsubscribe send failed: %s", exc)
             else:
@@ -340,7 +327,7 @@ class WSManager:
             # No logical subscriptions left → drop the connection so we
             # don't hold an idle socket (and any cancel-on-disconnect with it).
             if not self._subs:
-                await self._teardown()
+                await self._close_connection()
         return {"subscription_id": subscription_id, "channel": channel, "closed": True}
 
 

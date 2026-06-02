@@ -20,6 +20,10 @@ InstrumentKind = Literal["FUTURE", "OPTION"]
 MarginKind = Literal["INVERSE", "LINEAR"]
 InstrumentState = Literal["ACTIVE", "EXPIRED"]
 
+# Safety bound on the venue-filter page walk so a misbehaving cursor can
+# never loop forever; the result reports `truncated` if this cap is hit.
+_MAX_COUNTERPARTY_PAGES = 100
+
 
 @server.tool(
     name="paradigm_drfqv2_instruments",
@@ -158,7 +162,8 @@ async def paradigm_drfqv2_counterparties(
     scanned = 0
     page_cursor = cursor
     # Bound the walk so a misbehaving cursor can never loop forever.
-    for _ in range(100):
+    truncated = True
+    for _ in range(_MAX_COUNTERPARTY_PAGES):
         resp = await client.get(
             "/v2/drfq/counterparties/",
             cursor=page_cursor,
@@ -169,10 +174,14 @@ async def paradigm_drfqv2_counterparties(
         matched.extend(d for d in items if _desk_supports_venue(d, venue))
         page_cursor = _next_cursor(resp)
         if not page_cursor:
+            truncated = False  # reached the last page → result is complete
             break
     return {
         "results": matched,
         "count": len(matched),
         "venue": venue,
         "scanned": scanned,
+        # True if the page cap was hit before exhausting the list, so the
+        # caller knows the set may be incomplete rather than assuming it's all.
+        "truncated": truncated,
     }

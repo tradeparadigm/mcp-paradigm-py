@@ -89,6 +89,7 @@ async def test_counterparties_venue_filter_pages_and_filters(
     assert out["venue"] == "PRDX"
     assert out["scanned"] == 3
     assert out["count"] == 2
+    assert out["truncated"] is False  # reached the last page → complete
     assert {d["desk_name"] for d in out["results"]} == {"A", "C"}
     # Walked both pages.
     assert len(client.calls) == 2
