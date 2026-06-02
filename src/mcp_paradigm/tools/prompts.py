@@ -99,4 +99,9 @@ def stream_and_tail(
 
 This replaces REST polling loops (e.g. repeatedly calling
 `paradigm_drfqv2_rfq_snapshot`) and pushes quotes in near-real-time. If `poll`
-ever reports `connected: false`, the socket dropped — re-subscribe to reconnect."""
+ever reports `connected: false`, the socket dropped — re-subscribe to reconnect.
+
+To watch for failures, subscribe `trade` (and/or `order`): there's no separate
+error channel, but rejected trades/orders arrive on these streams and `poll`
+attaches a structured `rejection` block ({{reason, code, message, request_id,
+timestamp}}) to each, so a rejection reads as a rejection — not "still waiting"."""

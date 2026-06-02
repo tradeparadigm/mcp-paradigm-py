@@ -74,6 +74,43 @@ async def test_counterparties_expose_venues() -> None:
 
 
 @pytest.mark.asyncio
+async def test_counterparties_pagination_contract() -> None:
+    """The unfiltered tool path returns the normalized cursor contract."""
+    from mcp_paradigm.tools.drfqv2 import reference
+
+    out = await reference.paradigm_drfqv2_counterparties(page_size=5)
+    assert isinstance(out, dict)
+    for key in ("results", "count", "next_cursor", "has_more", "total"):
+        assert key in out, f"pagination contract missing `{key}`: {out.keys()}"
+    assert isinstance(out["results"], list)
+
+
+@pytest.mark.asyncio
+async def test_counterparties_prime_signal_probe() -> None:
+    """Surface whether the live payload carries any prime-venue signal.
+
+    Items 2's prime filter only works if the backend exposes prime info.
+    This walks the desks and checks ``_desk_prime_venue_enabled``; if no
+    desk carries a signal it *skips* with a message that documents the
+    finding (the backend ask) rather than failing.
+    """
+    from mcp_paradigm.tools.drfqv2 import reference
+
+    out = await reference.paradigm_drfqv2_counterparties(fetch_all=True)
+    desks = out["results"]
+    states = [d.get("prime_venue_enabled") for d in desks if isinstance(d, dict)]
+    if not any(s is not None for s in states):
+        pytest.skip(
+            "no desk carries a prime-venue signal — the counterparties "
+            "payload does not expose prime info; prime_only is a documented "
+            "no-op until the backend adds it (see _desk_prime_venue_enabled)."
+        )
+    # If a signal exists, the filter must agree with the annotation.
+    prime = await reference.paradigm_drfqv2_counterparties(prime_only=True)
+    assert all(d.get("prime_venue_enabled") for d in prime["results"])
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("channel", CHANNELS)
 async def test_websocket_subscribe_poll_unsubscribe(channel: str) -> None:
     """The live socket accepts each documented channel.

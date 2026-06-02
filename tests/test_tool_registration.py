@@ -41,6 +41,8 @@ async def test_counterparties_exposes_venue_filter() -> None:
     tools = {t.name: t for t in await server.list_tools()}
     props = tools["paradigm_drfqv2_counterparties"].inputSchema["properties"]
     assert "venue" in props, "counterparties must expose a `venue` filter"
+    assert "prime_only" in props, "counterparties must expose a `prime_only` filter"
+    assert "fetch_all" in props, "counterparties must expose a `fetch_all` flag"
 
 
 @pytest.mark.asyncio

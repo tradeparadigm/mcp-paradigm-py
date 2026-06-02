@@ -17,6 +17,7 @@ from mcp_paradigm.utils.errors import (
     ParadigmRateLimitedError,
     ParadigmServerError,
     ParadigmValidationError,
+    normalize_rejection,
     raise_for_status,
 )
 
@@ -115,6 +116,9 @@ def test_to_dict_round_trips_all_fields() -> None:
     assert "hint" in d
     assert d["hint"] is not None
     assert d["message"] == str(exc)
+    # Timestamp is stamped at construction and surfaced for correlation.
+    assert d["timestamp"] == exc.timestamp
+    assert d["timestamp"].endswith("Z")
 
 
 def test_raise_for_status_maps_codes_and_passes_context() -> None:
@@ -177,3 +181,32 @@ def test_long_body_truncated_in_message() -> None:
     assert "…(+" in msg
     # Sanity: message should be reasonably bounded.
     assert len(msg) < 6000
+
+
+def test_normalize_rejection_on_rejected_state() -> None:
+    body = {"id": "t1", "state": "REJECTED", "rejection_reason": "PRICE_OUT_OF_BAND"}
+    meta = {"request_id": "req-9", "timestamp": "2026-06-02T00:00:00Z"}
+    out = normalize_rejection(body, meta)
+    assert out is not None
+    assert out["reason"] == "PRICE_OUT_OF_BAND"
+    assert out["request_id"] == "req-9"
+    assert out["timestamp"] == "2026-06-02T00:00:00Z"
+
+
+def test_normalize_rejection_from_error_field_without_state() -> None:
+    body = {"error": "insufficient_margin", "message": "Not enough margin.", "code": 400}
+    out = normalize_rejection(body)
+    assert out is not None
+    assert out["reason"] == "insufficient_margin"
+    assert out["message"] == "Not enough margin."
+    assert out["code"] == 400
+    # No meta → a timestamp is still stamped.
+    assert out["timestamp"].endswith("Z")
+
+
+def test_normalize_rejection_returns_none_for_non_rejection() -> None:
+    # A bare PENDING order with no error must pass through untouched.
+    assert normalize_rejection({"id": "o1", "state": "PENDING"}) is None
+    assert normalize_rejection({"state": "COMPLETED"}) is None
+    assert normalize_rejection("nope") is None
+    assert normalize_rejection(None) is None

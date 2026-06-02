@@ -8,6 +8,7 @@ from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
 from mcp_paradigm.server.server import server
+from mcp_paradigm.utils.errors import normalize_rejection
 from mcp_paradigm.utils.paradigm_client import get_paradigm_client
 
 Venue = Literal["BIT", "BYB", "DBT", "PRDX", "RBN", "TTN", "BLT", "FBX", "FKN", "FTX", "SKD", "CME"]
@@ -115,4 +116,8 @@ async def paradigm_drfqv2_create_rfq(
         body["account_name"] = account_name
     if label is not None:
         body["label"] = label
-    return await client.post("/v2/drfq/rfqs/", json_body=body)
+    resp, meta = await client.post("/v2/drfq/rfqs/", json_body=body, with_meta=True)
+    rejection = normalize_rejection(resp, meta)
+    if rejection is not None and isinstance(resp, dict):
+        return {**resp, "rejection": rejection}
+    return resp
