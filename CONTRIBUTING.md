@@ -42,7 +42,7 @@ just test             # all unit tests
 just test-cov         # coverage report to htmlcov/
 ```
 
-Integration tests against `api.test.paradigm.co` are gated behind
+Integration tests against `api.testnet.paradigm.trade` are gated behind
 `@pytest.mark.integration` and skipped by default. Run with
 `pytest -m integration` once you have testnet credentials.
 

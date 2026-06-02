@@ -45,12 +45,14 @@ Set your Paradigm access key and signing key. The signing key is
 base64-encoded as issued by Paradigm.
 
 ```bash
+# Required — the server can't authenticate without these two:
 export PARADIGM_ACCESS_KEY="..."         # bearer token (access key id)
 export PARADIGM_SIGNING_KEY="..."        # base64-encoded HMAC key
-export PARADIGM_ENVIRONMENT="testnet"    # or "prod"
-# Optional overrides:
-# export PARADIGM_BASE_URL="https://api.test.paradigm.co"
-# export PARADIGM_WS_URL="wss://ws.api.test.paradigm.trade/v2/drfq/"
+
+# Optional (sensible defaults; only set if you need to override):
+export PARADIGM_ENVIRONMENT="testnet"    # "prod" (default) or "testnet"
+# export PARADIGM_BASE_URL="https://api.testnet.paradigm.trade"
+# export PARADIGM_WS_URL="wss://ws.api.testnet.paradigm.trade/v2/drfq/"
 # export PARADIGM_ACCOUNT="my-desk"      # if running multi-desk
 ```
 
@@ -110,6 +112,12 @@ If signing is broken you'll see a 401 with `Invalid signature`.
 | OBv1 | `paradigm_obv1_{obs, create_ob, quotes, post_quote, cancel, orders, trades, instruments, price_legs, mmp}` |
 | FSPD | `paradigm_fspd_{instruments, strategies, orderbook, orders, post_order, cancel, trades, venues, system, mmp}` |
 | Firm | `paradigm_identity_credentials`, `paradigm_positions`, `paradigm_leaderboard`, `paradigm_leaderboard_preferences` |
+
+### Prompts
+
+Canned workflow playbooks clients can surface in a menu — they guide the
+tool sequence without executing it: `quote_rfq` (maker), `broadcast_rfq`
+(taker), `stream_and_tail` (consume a live WebSocket channel).
 
 ### Conventions
 

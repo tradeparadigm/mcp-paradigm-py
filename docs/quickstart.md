@@ -21,7 +21,7 @@ Mint an access key + signing key from the Paradigm admin UI. You need:
   outbound request. **Keep this secret.**
 
 For first-time wiring use the testnet environment
-(`api.test.paradigm.co`).
+(`api.testnet.paradigm.trade`).
 
 ## 3. Configure
 
@@ -60,25 +60,31 @@ In another shell, use any MCP client (or the `mcp` CLI) to call
 }
 ```
 
-Or install the MCPB bundle (`mcp-paradigm-0.1.0.mcpb`) from the latest
+Or install the prebuilt `.mcpb` bundle from the latest
 [GitHub release](https://github.com/tradeparadigm/mcp-paradigm-py/releases)
 — Claude Desktop will prompt you for the access key + signing key on
 first run.
 
 ## 6. First workflow
 
-A typical taker flow:
+A typical DRFQv2 taker flow:
 
 ```
-paradigm_platform_state           # check exchange operational
-paradigm_counterparties           # who can I RFQ?
-paradigm_instruments venue=DBT    # find what's tradable
-paradigm_create_rfq …             # ⚠ approval prompt
-paradigm_rfq_bbo / paradigm_rfq_orders   # see quotes come in
-paradigm_post_order time_in_force=FILL_OR_KILL …   # ⚠ approval prompt
-paradigm_trade trade_id=…         # confirm settlement
+paradigm_desk_overview                       # positions, MMP, platform state
+paradigm_drfqv2_counterparties venue=PRDX    # which LPs can quote this venue?
+paradigm_drfqv2_instruments venue=DBT        # find what's tradable
+paradigm_drfqv2_create_rfq …                 # ⚠ approval prompt (broadcast by default)
+paradigm_drfqv2_rfq_snapshot rfq_id=…        # RFQ + BBO + orders as quotes arrive
+paradigm_drfqv2_post_order …                 # ⚠ approval prompt (cross to trade)
+paradigm_drfqv2_trades trade_id=…            # confirm settlement
 ```
 
-`paradigm_create_rfq`, `paradigm_post_order`, `paradigm_update_order`,
-and `paradigm_mmp_reset` are annotated `destructiveHint=true` — MCP
-clients should display an approval prompt before invoking them.
+Prefer the workflow tools — `paradigm_desk_overview`,
+`paradigm_drfqv2_rfq_snapshot` — over wiring the individual GETs yourself.
+For live quotes instead of polling, use `paradigm_subscribe('bbo')` →
+`paradigm_poll(subscription_id)` → `paradigm_unsubscribe`.
+
+`paradigm_drfqv2_create_rfq`, `paradigm_drfqv2_post_order`,
+`paradigm_drfqv2_cancel`, `paradigm_drfqv2_mmp(action='reset')`, and
+`paradigm_kill_switch` are annotated `destructiveHint=true` — MCP clients
+should display an approval prompt before invoking them.

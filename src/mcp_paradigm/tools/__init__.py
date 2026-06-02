@@ -17,5 +17,6 @@ from . import (
     firm,
     fspd,
     obv1,
+    prompts,
     workflow,
 )

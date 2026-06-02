@@ -90,7 +90,7 @@ tool surface to Claude Code / Claude Desktop / any MCP-aware client.
         │         └──┤ SidecarHttpSigner       │  custom (planned)
         │            └──────────────────────────┘
         │
-        └──►  Paradigm REST (api.paradigm.co or api.test.paradigm.co)
+        └──►  Paradigm REST (api.prod.paradigm.trade or api.testnet.paradigm.trade)
 ```
 
 ---
@@ -181,6 +181,18 @@ subscribe frames for every still-live channel.
 | `paradigm_subscribe(channel, cancel_on_disconnect=false)` | Open a subscription, return `subscription_id`. Channels: `rfq`, `order`, `bbo`, `trade`, `trade_confirmation`, `mmp` |
 | `paradigm_poll(subscription_id, since?, limit?)` | Drain buffered events; returns `events[]` (each with `seq`/`channel`/`received_at`/`data`) and the next `cursor` |
 | `paradigm_unsubscribe(subscription_id)` | Close a subscription; tears the connection down when the last one closes |
+
+### 3.8 Prompts
+
+Workflow playbooks exposed via `@server.prompt` (in `tools/prompts.py`).
+They guide the tool sequence for common flows but don't execute — the
+agent still calls the tools, and destructive steps still prompt.
+
+| Prompt | Flow |
+|---|---|
+| `quote_rfq(rfq_id)` | Maker: snapshot → price_legs → post_order → confirm |
+| `broadcast_rfq(venue, base_currency?)` | Taker: counterparties → create_rfq (empty = broadcast) → watch quotes |
+| `stream_and_tail(channel='rfq')` | subscribe → poll loop → unsubscribe (replaces REST polling) |
 
 ---
 

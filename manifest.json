@@ -95,6 +95,18 @@
       "description": "DRFQv2 MMP \u2014 action='status' to read, 'reset' to re-arm."
     },
     {
+      "name": "paradigm_subscribe",
+      "description": "Open a DRFQv2 WebSocket subscription (rfq, order, bbo, trade, trade_confirmation, mmp) and return a subscription_id."
+    },
+    {
+      "name": "paradigm_poll",
+      "description": "Drain buffered events for a subscription; returns events[] and a cursor that advances each call. Use instead of REST polling."
+    },
+    {
+      "name": "paradigm_unsubscribe",
+      "description": "Close a DRFQv2 WebSocket subscription; the shared connection is torn down when the last one closes."
+    },
+    {
       "name": "paradigm_obv1_obs",
       "description": "List active OBv1 order book markets. For full state use paradigm_obv1_market_snapshot."
     },
@@ -230,7 +242,7 @@
     "paradigm_fspd_base_url": {
       "type": "string",
       "title": "FSPD Base URL Override",
-      "description": "Optional override for the FSPD API base URL. Defaults to api.fspd.paradigm.co (prod) or api.fspd.test.paradigm.co (testnet).",
+      "description": "Optional override for the FSPD API base URL. Defaults to api.fs.prod.paradigm.co (prod) or api.fs.testnet.paradigm.co (testnet).",
       "required": false
     }
   },

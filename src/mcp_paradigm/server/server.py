@@ -55,6 +55,8 @@ system, mmp}}.
 Firm-level (cross-product): paradigm_identity_credentials,
 paradigm_positions, paradigm_leaderboard, paradigm_leaderboard_preferences.
 
+Prompts (workflow playbooks): quote_rfq, broadcast_rfq, stream_and_tail.
+
 Conventions: list-and-single are merged (pass `*_id` to fetch one);
 MMP status+reset are merged (`action` param); post/replace and
 post/update are merged (pass the id to amend). Tools annotated
