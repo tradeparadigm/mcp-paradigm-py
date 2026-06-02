@@ -23,6 +23,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from mcp_paradigm.utils.models import Rejection
+
 _BODY_PREVIEW_MAX = 1000  # chars before truncation in the message
 
 
@@ -230,14 +232,14 @@ def normalize_rejection(body: Any, meta: dict[str, Any] | None = None) -> dict[s
     if not state_rejected and reason is None:
         return None
 
-    block: dict[str, Any] = {
-        "code": code,
-        "reason": reason if reason is not None else (state if state_rejected else None),
-        "message": message,
-        "request_id": (meta or {}).get("request_id"),
-        "timestamp": (meta or {}).get("timestamp") or _utc_now_iso(),
-    }
-    return block
+    block = Rejection(
+        code=code,
+        reason=reason if reason is not None else (state if state_rejected else None),
+        message=message,
+        request_id=(meta or {}).get("request_id"),
+        timestamp=(meta or {}).get("timestamp") or _utc_now_iso(),
+    )
+    return block.model_dump()
 
 
 def raise_for_status(

@@ -17,9 +17,41 @@ from pydantic import Field
 
 from mcp_paradigm.server.server import server
 from mcp_paradigm.utils.errors import normalize_rejection
+from mcp_paradigm.utils.models import PermissiveModel
 from mcp_paradigm.utils.ws_manager import CHANNELS, get_ws_manager
 
 Channel = Literal["rfq", "order", "bbo", "trade", "trade_confirmation", "mmp"]
+
+
+class Subscription(PermissiveModel):
+    """Owned ack returned by ``paradigm_subscribe``."""
+
+    subscription_id: str
+    channel: str
+    cancel_on_disconnect: bool | None = None
+
+
+class PollResult(PermissiveModel):
+    """Owned envelope returned by ``paradigm_poll``.
+
+    ``events`` holds raw buffered events (each possibly carrying a
+    ``rejection`` block); they're passed through as ``Any``.
+    """
+
+    subscription_id: str
+    channel: str
+    events: list[Any] = Field(default_factory=list)
+    cursor: int | None = None
+    connected: bool | None = None
+
+
+class Unsubscribed(PermissiveModel):
+    """Owned ack returned by ``paradigm_unsubscribe``."""
+
+    subscription_id: str
+    channel: str
+    closed: bool | None = None
+
 
 # Channels whose events can carry a rejection we want to surface as a
 # structured block (Paradigm has no dedicated error channel — rejections
@@ -62,7 +94,7 @@ async def paradigm_subscribe(
             )
         ),
     ] = False,
-) -> dict[str, Any]:
+) -> Subscription:
     """Open a DRFQv2 WebSocket subscription and return its ``subscription_id``.
 
     The server holds one shared WebSocket connection and keeps the events
@@ -95,7 +127,7 @@ async def paradigm_poll(
         int | None,
         Field(description="Max events to return this poll.", ge=1, le=10000),
     ] = None,
-) -> dict[str, Any]:
+) -> PollResult:
     """Drain buffered events for a subscription.
 
     Returns ``{events, cursor, channel, connected}``. Each event carries a
@@ -127,7 +159,7 @@ async def paradigm_poll(
 )
 async def paradigm_unsubscribe(
     subscription_id: Annotated[str, Field(description="Id returned by paradigm_subscribe.")],
-) -> dict[str, Any]:
+) -> Unsubscribed:
     """Close a DRFQv2 WebSocket subscription.
 
     When the last subscription closes, the shared WebSocket connection is

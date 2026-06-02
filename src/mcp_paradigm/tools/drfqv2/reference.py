@@ -13,7 +13,29 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from mcp_paradigm.server.server import server
+from mcp_paradigm.utils.models import PermissiveModel
 from mcp_paradigm.utils.paradigm_client import ParadigmClient, get_paradigm_client
+
+
+class CounterpartiesResult(PermissiveModel):
+    """Owned envelope for ``paradigm_drfqv2_counterparties`` (all modes).
+
+    Single-page mode populates ``next_cursor``/``has_more``/``total``; the
+    full-walk modes populate ``scanned``/``truncated`` (and ``venue`` /
+    ``note`` when filtering). ``results`` holds raw upstream desk objects,
+    passed through untouched.
+    """
+
+    results: list[Any] = Field(default_factory=list)
+    count: int | None = None
+    next_cursor: str | None = None
+    has_more: bool | None = None
+    total: int | None = None
+    scanned: int | None = None
+    truncated: bool | None = None
+    venue: str | None = None
+    note: str | None = None
+
 
 Venue = Literal["BIT", "BYB", "DBT", "PRDX"]
 BaseCurrency = Literal["AVAX", "BCH", "BTC", "ETH", "SOL", "TONCOIN", "TRX", "XRP"]
@@ -304,7 +326,7 @@ async def paradigm_drfqv2_counterparties(
     ] = False,
     cursor: Annotated[str | None, Field(description="Pagination cursor.")] = None,
     page_size: Annotated[int | None, Field(description="Page size.", ge=1, le=1000)] = None,
-) -> Any:
+) -> CounterpartiesResult:
     """List counterparty desks the firm can RFQ.
 
     Each desk exposes ``desk_name``, ``firm_name``, ``groups``, ``id`` and

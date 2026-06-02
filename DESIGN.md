@@ -103,6 +103,17 @@ Conventions:
 - Snake_case.
 - Singular = "get one"; plural = "list".
 - All list tools accept `cursor` and `page_size` for pagination.
+- **Structured output for owned envelopes only.** Tools whose return is a
+  shape the server *constructs* — the counterparties pagination/walk
+  envelope, the streaming subscribe/poll/unsubscribe acks — return a
+  permissive Pydantic model (`utils/models.py::PermissiveModel`,
+  `extra="allow"`), so FastMCP advertises an `outputSchema` and emits
+  structured content. Raw upstream objects (RFQs, orders, trades, desks)
+  stay passthrough `Any`: pinning them to a strict model would turn an
+  upstream field change into a validation failure. The embedded
+  passthrough sub-objects inside an envelope (`results[]`, `events[]`)
+  are typed `Any` for the same reason. The `rejection` block shares one
+  source of truth (`models.py::Rejection`).
 
 ### 3.1 Reference data
 

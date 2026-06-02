@@ -46,6 +46,23 @@ async def test_counterparties_exposes_venue_filter() -> None:
 
 
 @pytest.mark.asyncio
+async def test_owned_envelopes_expose_output_schema() -> None:
+    """Tools returning a shape the server owns advertise a structured outputSchema."""
+    tools = {t.name: t for t in await server.list_tools()}
+    expected = {
+        "paradigm_drfqv2_counterparties": {"results", "count", "next_cursor", "has_more"},
+        "paradigm_poll": {"subscription_id", "channel", "events", "cursor", "connected"},
+        "paradigm_subscribe": {"subscription_id", "channel"},
+        "paradigm_unsubscribe": {"subscription_id", "channel", "closed"},
+    }
+    for name, must_have in expected.items():
+        schema = tools[name].outputSchema
+        assert schema is not None, f"{name} should advertise an outputSchema"
+        props = set(schema.get("properties", {}))
+        assert must_have <= props, f"{name} outputSchema missing {must_have - props}"
+
+
+@pytest.mark.asyncio
 async def test_create_rfq_counterparties_optional_with_broadcast_default() -> None:
     tools = {t.name: t for t in await server.list_tools()}
     schema = tools["paradigm_drfqv2_create_rfq"].inputSchema
