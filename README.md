@@ -45,12 +45,14 @@ Set your Paradigm access key and signing key. The signing key is
 base64-encoded as issued by Paradigm.
 
 ```bash
+# Required — the server can't authenticate without these two:
 export PARADIGM_ACCESS_KEY="..."         # bearer token (access key id)
 export PARADIGM_SIGNING_KEY="..."        # base64-encoded HMAC key
-export PARADIGM_ENVIRONMENT="testnet"    # or "prod"
-# Optional overrides:
-# export PARADIGM_BASE_URL="https://api.test.paradigm.co"
-# export PARADIGM_WS_URL="wss://ws.api.test.paradigm.trade/v2/drfq/"
+
+# Optional (sensible defaults; only set if you need to override):
+export PARADIGM_ENVIRONMENT="testnet"    # "prod" (default) or "testnet"
+# export PARADIGM_BASE_URL="https://api.testnet.paradigm.trade"
+# export PARADIGM_WS_URL="wss://ws.api.testnet.paradigm.trade/v2/drfq/"
 # export PARADIGM_ACCOUNT="my-desk"      # if running multi-desk
 ```
 
@@ -89,7 +91,7 @@ If signing is broken you'll see a 401 with `Invalid signature`.
 
 ## Tool surface
 
-39 tools, workflow-oriented. Full mapping in [DESIGN.md](DESIGN.md).
+43 tools, workflow-oriented. Full mapping in [DESIGN.md](DESIGN.md).
 
 ### Start here
 
@@ -106,9 +108,16 @@ If signing is broken you'll see a 401 with `Invalid signature`.
 | Product | Tools |
 |---|---|
 | DRFQv2 | `paradigm_drfqv2_{rfqs, create_rfq, orders, post_order, cancel, trades, instruments, counterparties, price_legs, mmp}` |
+| Streaming (DRFQv2 WS) | `paradigm_subscribe`, `paradigm_poll`, `paradigm_unsubscribe` |
 | OBv1 | `paradigm_obv1_{obs, create_ob, quotes, post_quote, cancel, orders, trades, instruments, price_legs, mmp}` |
 | FSPD | `paradigm_fspd_{instruments, strategies, orderbook, orders, post_order, cancel, trades, venues, system, mmp}` |
 | Firm | `paradigm_identity_credentials`, `paradigm_positions`, `paradigm_leaderboard`, `paradigm_leaderboard_preferences` |
+
+### Prompts
+
+Canned workflow playbooks clients can surface in a menu — they guide the
+tool sequence without executing it: `quote_rfq` (maker), `broadcast_rfq`
+(taker), `stream_and_tail` (consume a live WebSocket channel).
 
 ### Conventions
 
@@ -135,11 +144,21 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev loop.
 Signing is verified by `tests/test_signing.py` against the canonical
 Paradigm message layout (`<timestamp>\n<METHOD>\n<path-with-query>\n<body>`).
 
+## Streaming
+
+For live data, `paradigm_subscribe(channel)` opens a DRFQv2 WebSocket
+stream (`rfq`, `order`, `bbo`, `trade`, `trade_confirmation`, `mmp`) and
+returns a `subscription_id`. Drain events with
+`paradigm_poll(subscription_id)` — each carries a monotonic `seq` and the
+cursor advances automatically — and close with
+`paradigm_unsubscribe(subscription_id)`. The server holds one shared,
+heartbeated connection and buffers events (bounded by `PARADIGM_WS_BUFFER`
+/ `PARADIGM_WS_TTL`), so quotes push in rather than needing REST polling.
+
 ## Status
 
-Alpha. The REST surface is complete; WebSocket subscription tools
-(`paradigm_subscribe` / `paradigm_poll` / `paradigm_unsubscribe`) and
-production signers (Vault Transit, AWS KMS) are tracked in DESIGN.md.
+Alpha. REST and DRFQv2 WebSocket streaming are complete; production
+signers (Vault Transit, AWS KMS) are tracked in DESIGN.md.
 
 ## License
 

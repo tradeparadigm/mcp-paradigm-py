@@ -2,7 +2,7 @@
   "manifest_version": "0.4",
   "name": "mcp-paradigm",
   "display_name": "Paradigm",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MCP server for the Paradigm trading platform \u2014 DRFQv2 RFQs, OBv1 order books, FSPD future spreads, plus identity, positions, and leaderboards.",
   "long_description": "Wraps the Paradigm REST surfaces and exposes typed MCP tools across three active products: DRFQv2 (bilateral request-for-quote), OBv1 (Unified Markets order books \u2014 long-lived multi-counterparty auctions with maker quotes and taker fills), and FSPD (Future Spread Direct \u2014 orderbook for future spreads with limit/market orders, post-only/IOC, replace, cancel-all). Also covers firm-level identity credentials, positions, and the cross-firm trade-volume and liquidity leaderboards. Authenticated requests are HMAC-signed via a pluggable Signer (env-key for local; Vault Transit / AWS KMS planned). Order placement, quoting, market creation, and MMP reset are annotated destructive so MCP clients can prompt for approval.",
   "author": {
@@ -93,6 +93,18 @@
     {
       "name": "paradigm_drfqv2_mmp",
       "description": "DRFQv2 MMP \u2014 action='status' to read, 'reset' to re-arm."
+    },
+    {
+      "name": "paradigm_subscribe",
+      "description": "Open a DRFQv2 WebSocket subscription (rfq, order, bbo, trade, trade_confirmation, mmp) and return a subscription_id."
+    },
+    {
+      "name": "paradigm_poll",
+      "description": "Drain buffered events for a subscription; returns events[] and a cursor that advances each call. Use instead of REST polling."
+    },
+    {
+      "name": "paradigm_unsubscribe",
+      "description": "Close a DRFQv2 WebSocket subscription; the shared connection is torn down when the last one closes."
     },
     {
       "name": "paradigm_obv1_obs",
@@ -230,7 +242,7 @@
     "paradigm_fspd_base_url": {
       "type": "string",
       "title": "FSPD Base URL Override",
-      "description": "Optional override for the FSPD API base URL. Defaults to api.fspd.paradigm.co (prod) or api.fspd.test.paradigm.co (testnet).",
+      "description": "Optional override for the FSPD API base URL. Defaults to api.fs.prod.paradigm.co (prod) or api.fs.testnet.paradigm.co (testnet).",
       "required": false
     }
   },

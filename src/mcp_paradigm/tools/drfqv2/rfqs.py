@@ -65,8 +65,16 @@ async def paradigm_drfqv2_create_rfq(
     legs: Annotated[list[LegCreate], Field(description="Strategy legs.", min_length=1)],
     quantity: Annotated[str, Field(description="RFQ quantity (decimal string).")],
     counterparties: Annotated[
-        list[str], Field(description="Desk names to RFQ. Empty list = all eligible.")
-    ],
+        list[str],
+        Field(
+            description=(
+                "Desk names to RFQ (from paradigm_drfqv2_counterparties). "
+                "Leave empty (the default) to broadcast to every maker "
+                "eligible for the chosen venue — the platform fans the RFQ "
+                "out to all venue-eligible counterparties."
+            )
+        ),
+    ] = [],  # noqa: B006 — read-only default; never mutated below
     is_taker_anonymous: Annotated[
         bool, Field(description="Hide the taker desk name from counterparties.")
     ] = True,
@@ -82,7 +90,14 @@ async def paradigm_drfqv2_create_rfq(
         Field(description="OPEN sends now; DRAFT stages without notifying counterparties."),
     ] = "OPEN",
 ) -> Any:
-    """Create a new DRFQv2 RFQ to the chosen counterparties.
+    """Create a new DRFQv2 RFQ.
+
+    Broadcast semantics: when ``counterparties`` is empty (the default),
+    the RFQ fans out to **all makers eligible for ``venue``** — this is
+    the normal "ask the whole street" path. Pass an explicit list of desk
+    names (from ``paradigm_drfqv2_counterparties``) only to target a
+    subset; desks that don't support ``venue`` can't be quoted and are
+    skipped by the platform.
 
     Places a request-for-quote on the wire — gate behind explicit user
     confirmation.

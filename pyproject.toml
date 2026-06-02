@@ -1,6 +1,6 @@
 [project]
 name = "mcp-paradigm"
-version = "0.1.1"
+version = "0.1.2"
 description = "MCP server for the Paradigm trading platform (DRFQv2 + FSPD)"
 readme = "README.md"
 requires-python = ">=3.12,<3.15"
@@ -109,3 +109,6 @@ python_files = "test_*.py"
 python_functions = "test_*"
 addopts = "--cov=mcp_paradigm --cov-report=term-missing"
 asyncio_mode = "auto"
+markers = [
+    "integration: live tests against the Paradigm testnet API; skipped unless PARADIGM_ACCESS_KEY + PARADIGM_SIGNING_KEY are set (run with `pytest -m integration`).",
+]

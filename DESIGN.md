@@ -8,14 +8,15 @@ tool surface to Claude Code / Claude Desktop / any MCP-aware client.
 | Product | Status | REST host | Path prefix | Tools |
 |---|---|---|---|---|
 | **DRFQv2** — bilateral RFQ | active | `api.{prod\|testnet}.paradigm.trade` | `/v2/drfq/` | 11 |
+| **DRFQv2 streaming** — WebSocket | active | `ws.api.{prod\|testnet}.paradigm.trade` | `/v2/drfq/` | 3 |
 | **OBv1** — Unified Markets order books | active | `api.{prod\|testnet}.paradigm.trade` | `/v1/ob/` | 10 |
 | **FSPD** — Future Spread Direct | active | `api.fs.{prod\|testnet}.paradigm.co` | `/v1/fs/` | 10 |
-| **Firm** (cross-product) | active | `api.{prod\|testnet}.paradigm.trade` | `/v1/identity/`, `/v1/positions/`, `/v1/leaderboard/` | 4 |
+| **Firm** (cross-product) | active | `api.{prod\|testnet}.paradigm.trade` | `/v1/identity/`, `/v1/positions/`, `/v1/leaderboard/` | 5 |
 | **Workflow** (cross-product composites) | n/a | — | — | 4 |
 | **GRFQ** — Global RFQ | being deprecated (→ OBv1) | — | `/v1/grfq/` | skip |
 | **VRFQ** — Vanilla RFQ (Ribbon-style) | niche / contact-only | — | `/v1/vrfq/` | not planned |
 
-**39 tools total.** OBv1 and firm-level surfaces share the DRFQv2 host
+**43 tools total.** OBv1 and firm-level surfaces share the DRFQv2 host
 (reuse `get_paradigm_client()`); FSPD lives on its own host and uses
 `get_fspd_client()`.
 
@@ -89,7 +90,7 @@ tool surface to Claude Code / Claude Desktop / any MCP-aware client.
         │         └──┤ SidecarHttpSigner       │  custom (planned)
         │            └──────────────────────────┘
         │
-        └──►  Paradigm REST (api.paradigm.co or api.test.paradigm.co)
+        └──►  Paradigm REST (api.prod.paradigm.trade or api.testnet.paradigm.trade)
 ```
 
 ---
@@ -109,7 +110,7 @@ Conventions:
 |---|---|---|
 | `paradigm_instruments` | `GET /v2/drfq/instruments/` | List tradable instruments |
 | `paradigm_instrument` | `GET /v2/drfq/instruments/{id}/` | Fetch one instrument by id |
-| `paradigm_counterparties` | `GET /v2/drfq/counterparties/` | List desks the firm can RFQ |
+| `paradigm_counterparties` | `GET /v2/drfq/counterparties/` | List desks the firm can RFQ; each carries the `venues` it supports. Optional `venue` filter pages through and returns every desk that supports that venue (resolves "all LPs that support PRDX"). |
 | `paradigm_platform_state` | `GET /v2/drfq/platform_state/` | Maintenance windows |
 
 ### 3.2 RFQ lifecycle (taker)
@@ -121,6 +122,11 @@ Conventions:
 | `paradigm_rfq_bbo` | `GET /v2/drfq/rfqs/{id}/bbo/` | `paradigm:read` | no |
 | `paradigm_rfq_orders` | `GET /v2/drfq/rfqs/{id}/orders/` | `paradigm:read` | no |
 | `paradigm_create_rfq` | `POST /v2/drfq/rfqs/` | `paradigm:create_rfq` | **yes** |
+
+`paradigm_create_rfq`'s `counterparties` defaults to empty, which
+broadcasts the RFQ to **all makers eligible for the chosen venue** —
+the normal "ask the whole street" path. Pass explicit desk names only
+to narrow the audience.
 | `paradigm_cancel_rfq` | `DELETE /v2/drfq/rfqs/{id}/` | `paradigm:cancel` | no |
 
 ### 3.3 Order lifecycle (maker quote + taker cross)
@@ -156,16 +162,37 @@ Conventions:
 |---|---|
 | `paradigm_echo` | `GET` / `POST /v2/drfq/echo/` |
 
-### 3.7 WebSocket subscriptions (planned)
+### 3.7 WebSocket subscriptions
 
 WS events don't map naturally to request/response tools. The server
-will hold one WS connection per session and expose:
+holds one process-wide JSON-RPC-over-WebSocket connection and exposes a
+snapshot + tail interface on top of it. Events are buffered in a
+bounded, TTL-pruned ring (`PARADIGM_WS_BUFFER` / `PARADIGM_WS_TTL`);
+channels are reference-counted so the underlying subscribe/unsubscribe
+is sent once regardless of how many logical subscriptions are open. The
+connection signs its handshake with the same `Signer` as REST and sends
+a heartbeat every 5s (Paradigm closes idle-heartbeat sockets after 10s).
+On a silent drop the reader flags the connection down (`poll` reports
+`connected: false`); the next `subscribe` reconnects and re-sends the
+subscribe frames for every still-live channel.
 
 | Tool | Behavior |
 |---|---|
-| `paradigm_subscribe(channel)` | Open a subscription, return `subscription_id`. Channels: `rfq`, `order`, `trade`, `trade_confirmation`, `bbo`, `mmp` |
-| `paradigm_poll(subscription_id, since?, limit?)` | Drain buffered events; returns `events[]` and next cursor |
-| `paradigm_unsubscribe(subscription_id)` | Close a subscription |
+| `paradigm_subscribe(channel, cancel_on_disconnect=false)` | Open a subscription, return `subscription_id`. Channels: `rfq`, `order`, `bbo`, `trade`, `trade_confirmation`, `mmp` |
+| `paradigm_poll(subscription_id, since?, limit?)` | Drain buffered events; returns `events[]` (each with `seq`/`channel`/`received_at`/`data`) and the next `cursor` |
+| `paradigm_unsubscribe(subscription_id)` | Close a subscription; tears the connection down when the last one closes |
+
+### 3.8 Prompts
+
+Workflow playbooks exposed via `@server.prompt` (in `tools/prompts.py`).
+They guide the tool sequence for common flows but don't execute — the
+agent still calls the tools, and destructive steps still prompt.
+
+| Prompt | Flow |
+|---|---|
+| `quote_rfq(rfq_id)` | Maker: snapshot → price_legs → post_order → confirm |
+| `broadcast_rfq(venue, base_currency?)` | Taker: counterparties → create_rfq (empty = broadcast) → watch quotes |
+| `stream_and_tail(channel='rfq')` | subscribe → poll loop → unsubscribe (replaces REST polling) |
 
 ---
 
@@ -289,25 +316,33 @@ mcp-paradigm-py/
 
 ## 8. Testing
 
-Three layers:
+Four layers:
 
 1. **Signing unit tests** (`tests/test_signing.py`) — canonical message
    layout and key reuse, independently re-implemented for the assertion.
 2. **Client tests** (`tests/test_client.py`) — `httpx.MockTransport`
    asserts the headers, path-with-query, and body bytes the server
    would send.
-3. **Integration tests** (planned) — point at `api.test.paradigm.co`,
-   hit `paradigm_echo`, then RFQ create + cancel against a known-safe
-   synthetic instrument. Tagged `@pytest.mark.integration`; skipped by
-   default.
+3. **Tool-registration guard** (`tests/test_tool_registration.py`) —
+   pins the tool count and asserts the streaming tools + counterparty
+   venue filter stay registered, so the docs can't silently drift.
+4. **Integration tests** (`tests/test_integration.py`) — point at
+   testnet: `paradigm_echo`, counterparty `venues` shape, a live
+   WebSocket subscribe→poll→unsubscribe across every channel (catches a
+   wrong channel name or broken handshake), and an opt-in broadcast RFQ
+   create + cancel. Tagged `@pytest.mark.integration`; skipped unless
+   credentials are set, and the write path additionally requires
+   `PARADIGM_INTEGRATION_WRITES=1` plus an operator-supplied instrument.
 
 ---
 
 ## 9. Open questions
 
-1. **Per-session vs per-process WS connection.** Per-session needs the
-   server to map OAuth `sub` to a WS identity; per-process is simpler
-   but conflates fills across users.
+1. **Per-session vs per-process WS connection.** *Resolved:* shipped
+   per-process (`WSManager` singleton) — simplest, and matches the
+   shared signed REST client. Per-session mapping of OAuth `sub` to a WS
+   identity is revisited if/when the HTTP transport carries multiple
+   desks on one process.
 2. **Should `paradigm_post_order` block until terminal state?** Default
    to return-immediately + tool annotation that the caller should poll
    or subscribe. Optional `wait_for_terminal: bool = false` later.

@@ -10,5 +10,6 @@ from . import (
     pricing,
     reference,
     rfqs,
+    streaming,
     trades,
 )

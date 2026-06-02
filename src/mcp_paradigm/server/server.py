@@ -40,6 +40,10 @@ Per-product (DRFQv2 bilateral RFQ): paradigm_drfqv2_{{rfqs, orders,
 post_order, cancel, trades, instruments, counterparties, price_legs,
 mmp, create_rfq}}.
 
+Live data (DRFQv2 WebSocket): paradigm_subscribe(channel) →
+paradigm_poll(subscription_id) → paradigm_unsubscribe. Channels: rfq,
+order, bbo, trade, trade_confirmation, mmp. Use instead of REST polling.
+
 Per-product (OBv1 order books): paradigm_obv1_{{obs, create_ob,
 quotes, post_quote, cancel, orders, trades, instruments, price_legs,
 mmp}}.
@@ -50,6 +54,8 @@ system, mmp}}.
 
 Firm-level (cross-product): paradigm_identity_credentials,
 paradigm_positions, paradigm_leaderboard, paradigm_leaderboard_preferences.
+
+Prompts (workflow playbooks): quote_rfq, broadcast_rfq, stream_and_tail.
 
 Conventions: list-and-single are merged (pass `*_id` to fetch one);
 MMP status+reset are merged (`action` param); post/replace and
