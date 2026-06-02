@@ -109,3 +109,6 @@ python_files = "test_*.py"
 python_functions = "test_*"
 addopts = "--cov=mcp_paradigm --cov-report=term-missing"
 asyncio_mode = "auto"
+markers = [
+    "integration: live tests against the Paradigm testnet API; skipped unless PARADIGM_ACCESS_KEY + PARADIGM_SIGNING_KEY are set (run with `pytest -m integration`).",
+]

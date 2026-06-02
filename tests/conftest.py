@@ -9,8 +9,14 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def _paradigm_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Provide a deterministic signing key + access key for the test session."""
+def _paradigm_env(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Provide a deterministic signing key + access key for the test session.
+
+    Integration tests (``@pytest.mark.integration``) opt out so they run
+    against the real credentials in the environment instead of the fakes.
+    """
+    if request.node.get_closest_marker("integration"):
+        return
     key_b64 = base64.b64encode(b"k" * 32).decode("ascii")
     monkeypatch.setenv("PARADIGM_ACCESS_KEY", "ak_test")
     monkeypatch.setenv("PARADIGM_SIGNING_KEY", key_b64)

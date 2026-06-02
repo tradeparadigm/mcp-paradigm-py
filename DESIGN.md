@@ -304,17 +304,23 @@ mcp-paradigm-py/
 
 ## 8. Testing
 
-Three layers:
+Four layers:
 
 1. **Signing unit tests** (`tests/test_signing.py`) — canonical message
    layout and key reuse, independently re-implemented for the assertion.
 2. **Client tests** (`tests/test_client.py`) — `httpx.MockTransport`
    asserts the headers, path-with-query, and body bytes the server
    would send.
-3. **Integration tests** (planned) — point at `api.test.paradigm.co`,
-   hit `paradigm_echo`, then RFQ create + cancel against a known-safe
-   synthetic instrument. Tagged `@pytest.mark.integration`; skipped by
-   default.
+3. **Tool-registration guard** (`tests/test_tool_registration.py`) —
+   pins the tool count and asserts the streaming tools + counterparty
+   venue filter stay registered, so the docs can't silently drift.
+4. **Integration tests** (`tests/test_integration.py`) — point at
+   testnet: `paradigm_echo`, counterparty `venues` shape, a live
+   WebSocket subscribe→poll→unsubscribe across every channel (catches a
+   wrong channel name or broken handshake), and an opt-in broadcast RFQ
+   create + cancel. Tagged `@pytest.mark.integration`; skipped unless
+   credentials are set, and the write path additionally requires
+   `PARADIGM_INTEGRATION_WRITES=1` plus an operator-supplied instrument.
 
 ---
 
