@@ -58,8 +58,11 @@ async def test_owned_envelopes_expose_output_schema() -> None:
     for name, must_have in expected.items():
         schema = tools[name].outputSchema
         assert schema is not None, f"{name} should advertise an outputSchema"
-        props = set(schema.get("properties", {}))
-        assert must_have <= props, f"{name} outputSchema missing {must_have - props}"
+        props = schema.get("properties", {})
+        assert must_have <= set(props), f"{name} outputSchema missing {must_have - set(props)}"
+        # Every owned-envelope field must carry a Field description.
+        missing = [k for k, v in props.items() if not v.get("description")]
+        assert not missing, f"{name} outputSchema fields lack descriptions: {missing}"
 
 
 @pytest.mark.asyncio
