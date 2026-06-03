@@ -41,6 +41,28 @@ async def test_counterparties_exposes_venue_filter() -> None:
     tools = {t.name: t for t in await server.list_tools()}
     props = tools["paradigm_drfqv2_counterparties"].inputSchema["properties"]
     assert "venue" in props, "counterparties must expose a `venue` filter"
+    assert "prime_only" in props, "counterparties must expose a `prime_only` filter"
+    assert "fetch_all" in props, "counterparties must expose a `fetch_all` flag"
+
+
+@pytest.mark.asyncio
+async def test_owned_envelopes_expose_output_schema() -> None:
+    """Tools returning a shape the server owns advertise a structured outputSchema."""
+    tools = {t.name: t for t in await server.list_tools()}
+    expected = {
+        "paradigm_drfqv2_counterparties": {"results", "count", "next_cursor", "has_more"},
+        "paradigm_poll": {"subscription_id", "channel", "events", "cursor", "connected"},
+        "paradigm_subscribe": {"subscription_id", "channel"},
+        "paradigm_unsubscribe": {"subscription_id", "channel", "closed"},
+    }
+    for name, must_have in expected.items():
+        schema = tools[name].outputSchema
+        assert schema is not None, f"{name} should advertise an outputSchema"
+        props = schema.get("properties", {})
+        assert must_have <= set(props), f"{name} outputSchema missing {must_have - set(props)}"
+        # Every owned-envelope field must carry a Field description.
+        missing = [k for k, v in props.items() if not v.get("description")]
+        assert not missing, f"{name} outputSchema fields lack descriptions: {missing}"
 
 
 @pytest.mark.asyncio

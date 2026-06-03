@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlencode
 
@@ -78,11 +79,16 @@ class ParadigmClient:
         *,
         params: dict[str, Any] | None = None,
         json_body: Any = None,
+        with_meta: bool = False,
     ) -> Any:
         """Sign and send a single request. Returns parsed JSON (or ``None``).
 
         ``path`` must start with ``/v2/...`` — it is the path Paradigm
         signs over, with any query string appended in canonical form.
+
+        When ``with_meta`` is true the return is a ``(body, meta)`` tuple
+        where ``meta`` carries the response ``request_id`` and a receipt
+        ``timestamp`` — used by the write tools to stamp rejection blocks.
         """
         if not path.startswith("/"):
             path = "/" + path
@@ -125,6 +131,10 @@ class ParadigmClient:
             or response.headers.get("x-paradigm-request-id")
             or response.headers.get("request-id")
         )
+        meta = {
+            "request_id": request_id,
+            "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        }
 
         if response.status_code == 204 or not response.content:
             raise_for_status(
@@ -134,7 +144,7 @@ class ParadigmClient:
                 path=signed_path,
                 request_id=request_id,
             )
-            return None
+            return (None, meta) if with_meta else None
 
         try:
             body = response.json()
@@ -148,17 +158,19 @@ class ParadigmClient:
             path=signed_path,
             request_id=request_id,
         )
-        return body
+        return (body, meta) if with_meta else body
 
     # Convenience wrappers
     async def get(self, path: str, **params: Any) -> Any:
         return await self.request("GET", path, params=params)
 
-    async def post(self, path: str, json_body: Any | None = None) -> Any:
-        return await self.request("POST", path, json_body=json_body or {})
+    async def post(
+        self, path: str, json_body: Any | None = None, *, with_meta: bool = False
+    ) -> Any:
+        return await self.request("POST", path, json_body=json_body or {}, with_meta=with_meta)
 
-    async def put(self, path: str, json_body: Any | None = None) -> Any:
-        return await self.request("PUT", path, json_body=json_body or {})
+    async def put(self, path: str, json_body: Any | None = None, *, with_meta: bool = False) -> Any:
+        return await self.request("PUT", path, json_body=json_body or {}, with_meta=with_meta)
 
     async def patch(self, path: str, json_body: Any | None = None) -> Any:
         return await self.request("PATCH", path, json_body=json_body or {})

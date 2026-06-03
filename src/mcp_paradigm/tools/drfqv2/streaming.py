@@ -16,9 +16,78 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from mcp_paradigm.server.server import server
+from mcp_paradigm.utils.errors import normalize_rejection
+from mcp_paradigm.utils.models import PermissiveModel
 from mcp_paradigm.utils.ws_manager import CHANNELS, get_ws_manager
 
 Channel = Literal["rfq", "order", "bbo", "trade", "trade_confirmation", "mmp"]
+
+
+class Subscription(PermissiveModel):
+    """Owned ack returned by ``paradigm_subscribe``."""
+
+    subscription_id: Annotated[
+        str, Field(description="Id to pass to paradigm_poll / paradigm_unsubscribe.")
+    ]
+    channel: Annotated[str, Field(description="The subscribed channel.")]
+    cancel_on_disconnect: Annotated[
+        bool | None,
+        Field(description="Cancel-on-disconnect in effect for the shared socket."),
+    ] = None
+
+
+class PollResult(PermissiveModel):
+    """Owned envelope returned by ``paradigm_poll``.
+
+    ``events`` holds raw buffered events (each possibly carrying a
+    ``rejection`` block); they're passed through as ``Any``.
+    """
+
+    subscription_id: Annotated[str, Field(description="The polled subscription id.")]
+    channel: Annotated[str, Field(description="The subscription's channel.")]
+    events: Annotated[
+        list[Any],
+        Field(
+            default_factory=list,
+            description="Buffered events since the last cursor; each carries seq/channel/received_at/data (and a `rejection` block when applicable).",
+        ),
+    ]
+    cursor: Annotated[
+        int | None,
+        Field(description="Cursor to pass back as `since` (advances automatically)."),
+    ] = None
+    connected: Annotated[
+        bool | None,
+        Field(description="False if the socket dropped — re-subscribe to reconnect."),
+    ] = None
+
+
+class Unsubscribed(PermissiveModel):
+    """Owned ack returned by ``paradigm_unsubscribe``."""
+
+    subscription_id: Annotated[str, Field(description="The closed subscription id.")]
+    channel: Annotated[str, Field(description="The channel that was closed.")]
+    closed: Annotated[bool | None, Field(description="Always true on success.")] = None
+
+
+# Channels whose events can carry a rejection we want to surface as a
+# structured block (Paradigm has no dedicated error channel — rejections
+# arrive as state transitions on these streams).
+_REJECTION_CHANNELS = frozenset({"trade", "order"})
+
+
+def _annotate_rejection(event: dict[str, Any]) -> dict[str, Any]:
+    """Attach a structured ``rejection`` block to a rejected push event.
+
+    Mirrors the REST path so a pushed rejection is as legible as a polled
+    one. Non-rejection events pass through unchanged.
+    """
+    if event.get("channel") not in _REJECTION_CHANNELS:
+        return event
+    rejection = normalize_rejection(event.get("data"))
+    if rejection is None:
+        return event
+    return {**event, "rejection": rejection}
 
 
 @server.tool(
@@ -42,7 +111,7 @@ async def paradigm_subscribe(
             )
         ),
     ] = False,
-) -> dict[str, Any]:
+) -> Subscription:
     """Open a DRFQv2 WebSocket subscription and return its ``subscription_id``.
 
     The server holds one shared WebSocket connection and keeps the events
@@ -75,7 +144,7 @@ async def paradigm_poll(
         int | None,
         Field(description="Max events to return this poll.", ge=1, le=10000),
     ] = None,
-) -> dict[str, Any]:
+) -> PollResult:
     """Drain buffered events for a subscription.
 
     Returns ``{events, cursor, channel, connected}``. Each event carries a
@@ -84,9 +153,20 @@ async def paradigm_poll(
     again — the cursor advances automatically) to get only new events.
     Events age out of the buffer after the configured TTL, so poll often
     enough to keep up.
+
+    Rejections are pushed, not polled: Paradigm has no dedicated error
+    channel, so a rejected trade/order arrives as a state transition on
+    the ``trade``/``order`` channel. Such events are annotated with a
+    structured ``rejection`` block (``reason``/``code``/``message``/
+    ``timestamp``) so a failure reads as a failure rather than "still
+    waiting".
     """
     manager = await get_ws_manager()
-    return await manager.poll(subscription_id, since=since, limit=limit)
+    result = await manager.poll(subscription_id, since=since, limit=limit)
+    events = result.get("events")
+    if isinstance(events, list):
+        result["events"] = [_annotate_rejection(e) for e in events]
+    return result
 
 
 @server.tool(
@@ -96,7 +176,7 @@ async def paradigm_poll(
 )
 async def paradigm_unsubscribe(
     subscription_id: Annotated[str, Field(description="Id returned by paradigm_subscribe.")],
-) -> dict[str, Any]:
+) -> Unsubscribed:
     """Close a DRFQv2 WebSocket subscription.
 
     When the last subscription closes, the shared WebSocket connection is

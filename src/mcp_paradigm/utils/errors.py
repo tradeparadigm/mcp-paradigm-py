@@ -20,9 +20,17 @@ list, None) we include a truncated repr.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
+from mcp_paradigm.utils.models import Rejection
+
 _BODY_PREVIEW_MAX = 1000  # chars before truncation in the message
+
+
+def _utc_now_iso() -> str:
+    """Current UTC time as an ISO-8601 string with a trailing ``Z``."""
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 class ParadigmAPIError(Exception):
@@ -47,6 +55,7 @@ class ParadigmAPIError(Exception):
         self.method = method
         self.path = path
         self.request_id = request_id
+        self.timestamp = _utc_now_iso()
         super().__init__(self._format_message())
 
     def _format_message(self) -> str:
@@ -125,6 +134,7 @@ class ParadigmAPIError(Exception):
             "method": self.method,
             "path": self.path,
             "request_id": self.request_id,
+            "timestamp": self.timestamp,
             "body": self.body,
             "message": str(self),
             "hint": self._hint(),
@@ -173,6 +183,63 @@ def _truncate(s: str, limit: int) -> str:
     if len(s) <= limit:
         return s
     return s[:limit] + f"…(+{len(s) - limit} chars)"
+
+
+# Body keys that, by convention, carry a rejection reason code/enum.
+_REJECTION_REASON_KEYS = ("rejection_reason", "reject_reason", "reason", "error")
+# Body keys carrying a human-readable rejection message.
+_REJECTION_MESSAGE_KEYS = ("message", "detail", "rejection_message")
+# Body keys carrying a numeric/string rejection code.
+_REJECTION_CODE_KEYS = ("code", "reason_code", "error_code")
+
+
+def _first_present(body: dict[str, Any], keys: tuple[str, ...]) -> Any:
+    """Return the first non-empty value among ``keys`` in ``body``."""
+    for key in keys:
+        value = body.get(key)
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def normalize_rejection(body: Any, meta: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    """Structured rejection block for a 2xx body that signals a rejection.
+
+    Business-level rejections (a trade/order/RFQ that comes back
+    ``REJECTED``) arrive as ordinary 2xx responses, so the typed
+    ``ParadigmAPIError`` path never fires and the agent only sees a coarse
+    state enum — which is exactly why a failure "looks like still
+    waiting". This pulls the reason/code/message out of the body (across
+    the field names Paradigm uses) and stamps it with the request id +
+    timestamp from ``meta`` so the caller learns *why* in one shot.
+
+    Returns ``None`` when the body shows no sign of rejection, so callers
+    can attach the block conditionally without changing success payloads.
+    """
+    if not isinstance(body, dict):
+        return None
+
+    state = body.get("state") or body.get("status")
+    state_rejected = isinstance(state, str) and state.upper() == "REJECTED"
+
+    reason = _first_present(body, _REJECTION_REASON_KEYS)
+    message = _first_present(body, _REJECTION_MESSAGE_KEYS)
+    code = _first_present(body, _REJECTION_CODE_KEYS)
+
+    # Only treat the body as a rejection if it actually says so — either a
+    # REJECTED state, or an explicit reason/error field. A bare PENDING
+    # order with no error must pass through untouched.
+    if not state_rejected and reason is None:
+        return None
+
+    block = Rejection(
+        code=code,
+        reason=reason if reason is not None else (state if state_rejected else None),
+        message=message,
+        request_id=(meta or {}).get("request_id"),
+        timestamp=(meta or {}).get("timestamp") or _utc_now_iso(),
+    )
+    return block.model_dump()
 
 
 def raise_for_status(

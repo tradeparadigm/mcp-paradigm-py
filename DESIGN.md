@@ -103,6 +103,17 @@ Conventions:
 - Snake_case.
 - Singular = "get one"; plural = "list".
 - All list tools accept `cursor` and `page_size` for pagination.
+- **Structured output for owned envelopes only.** Tools whose return is a
+  shape the server *constructs* — the counterparties pagination/walk
+  envelope, the streaming subscribe/poll/unsubscribe acks — return a
+  permissive Pydantic model (`utils/models.py::PermissiveModel`,
+  `extra="allow"`), so FastMCP advertises an `outputSchema` and emits
+  structured content. Raw upstream objects (RFQs, orders, trades, desks)
+  stay passthrough `Any`: pinning them to a strict model would turn an
+  upstream field change into a validation failure. The embedded
+  passthrough sub-objects inside an envelope (`results[]`, `events[]`)
+  are typed `Any` for the same reason. The `rejection` block shares one
+  source of truth (`models.py::Rejection`).
 
 ### 3.1 Reference data
 
@@ -110,8 +121,29 @@ Conventions:
 |---|---|---|
 | `paradigm_instruments` | `GET /v2/drfq/instruments/` | List tradable instruments |
 | `paradigm_instrument` | `GET /v2/drfq/instruments/{id}/` | Fetch one instrument by id |
-| `paradigm_counterparties` | `GET /v2/drfq/counterparties/` | List desks the firm can RFQ; each carries the `venues` it supports. Optional `venue` filter pages through and returns every desk that supports that venue (resolves "all LPs that support PRDX"). |
+| `paradigm_counterparties` | `GET /v2/drfq/counterparties/` | List desks the firm can RFQ; each carries the `venues` it supports. See the pagination + prime notes below. |
 | `paradigm_platform_state` | `GET /v2/drfq/platform_state/` | Maintenance windows |
+
+**Counterparties pagination contract.** The default (no filter) call
+returns a single normalized page —
+`{results, count, next_cursor, has_more, total}` — instead of the raw DRF
+envelope. `next_cursor` is an opaque token you pass back as `cursor`;
+DRF's full-URL `next` is deliberately not surfaced because it can't be
+reused. Set `fetch_all=true` (or pass `venue`/`prime_only`) to page
+through every desk and get the complete set as
+`{results, count, scanned, truncated}` (`truncated` is true only if the
+internal page cap was hit before the list was exhausted).
+
+**Prime-venue filter.** Each desk is annotated with `prime_venue_enabled`:
+`true`/`false` when the payload carries a prime signal, `null` when the
+backend exposes none (so prime is never *inferred*). `prime_only=true`
+filters to prime LPs (for `venue` when both are set). The
+counterparties payload documents only
+`desk_name`/`firm_name`/`groups`/`id`/`venues` and no first-class `prime`
+field, so `_desk_prime_venue_enabled` derives it defensively (an explicit
+`prime_venues` list, a top-level prime boolean, or a prime marker in
+`groups`); if no desk carries a signal, `prime_only` returns an empty set
+plus an explanatory `note` rather than fabricating a flag.
 
 ### 3.2 RFQ lifecycle (taker)
 
@@ -148,6 +180,16 @@ to narrow the audience.
 | `paradigm_trade` | `GET /v2/drfq/trades/{id}/` |
 | `paradigm_trade_tape` | `GET /v2/drfq/trade_tape/` |
 
+**Structured rejections.** Business-level rejections come back as ordinary
+2xx responses (a trade in `REJECTED` state, a rejected RFQ/order), so the
+typed-exception path never fires and the agent only sees a coarse enum.
+`errors.normalize_rejection` extracts `reason`/`code`/`message` (across
+the field names Paradigm uses) and stamps `request_id`/`timestamp`. The
+write tools (`create_rfq`, `post_order`) attach this block to a rejected
+response; `paradigm_trades` attaches it to each `REJECTED` record. HTTP
+errors already carry the same context via `ParadigmAPIError.to_dict`,
+which now also includes a `timestamp`.
+
 ### 3.5 Pricing and MMP
 
 | Tool | REST | Approval |
@@ -181,6 +223,14 @@ subscribe frames for every still-live channel.
 | `paradigm_subscribe(channel, cancel_on_disconnect=false)` | Open a subscription, return `subscription_id`. Channels: `rfq`, `order`, `bbo`, `trade`, `trade_confirmation`, `mmp` |
 | `paradigm_poll(subscription_id, since?, limit?)` | Drain buffered events; returns `events[]` (each with `seq`/`channel`/`received_at`/`data`) and the next `cursor` |
 | `paradigm_unsubscribe(subscription_id)` | Close a subscription; tears the connection down when the last one closes |
+
+**Rejections are pushed, not polled.** Paradigm's DRFQ WebSocket has no
+dedicated error/reject channel — a rejected trade/order arrives as a
+state transition on the `trade`/`order` channel. `paradigm_poll`
+annotates such events with a structured `rejection` block
+(`reason`/`code`/`message`/`request_id`/`timestamp`, via
+`errors.normalize_rejection`) so a pushed failure reads as a failure
+rather than "still waiting" — the same block the REST write tools attach.
 
 ### 3.8 Prompts
 
