@@ -26,15 +26,48 @@ class CounterpartiesResult(PermissiveModel):
     passed through untouched.
     """
 
-    results: list[Any] = Field(default_factory=list)
-    count: int | None = None
-    next_cursor: str | None = None
-    has_more: bool | None = None
-    total: int | None = None
-    scanned: int | None = None
-    truncated: bool | None = None
-    venue: str | None = None
-    note: str | None = None
+    results: Annotated[
+        list[Any],
+        Field(
+            default_factory=list,
+            description="Matched counterparty desks (raw upstream objects, each annotated with `prime_venue_enabled`).",
+        ),
+    ]
+    count: Annotated[int | None, Field(description="Number of desks in `results`.")] = None
+    next_cursor: Annotated[
+        str | None,
+        Field(
+            description="Opaque cursor for the next page (single-page mode); pass back as `cursor`. Null when exhausted."
+        ),
+    ] = None
+    has_more: Annotated[
+        bool | None, Field(description="Whether another page exists (single-page mode).")
+    ] = None
+    total: Annotated[
+        int | None,
+        Field(
+            description="Total desk count across all pages, when the API reports it (single-page mode)."
+        ),
+    ] = None
+    scanned: Annotated[
+        int | None,
+        Field(description="Total desks scanned across all pages (full-walk modes)."),
+    ] = None
+    truncated: Annotated[
+        bool | None,
+        Field(
+            description="True if the internal page cap was hit before the list was exhausted (full-walk modes)."
+        ),
+    ] = None
+    venue: Annotated[
+        str | None, Field(description="The venue filter applied, echoed when filtering by venue.")
+    ] = None
+    note: Annotated[
+        str | None,
+        Field(
+            description="Set when `prime_only` was requested but no desk carried a prime signal."
+        ),
+    ] = None
 
 
 Venue = Literal["BIT", "BYB", "DBT", "PRDX"]

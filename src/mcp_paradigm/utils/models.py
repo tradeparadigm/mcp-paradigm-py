@@ -18,9 +18,9 @@ payload fields typed as ``Any``, so:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PermissiveModel(BaseModel):
@@ -36,8 +36,20 @@ class Rejection(PermissiveModel):
     builds and the REST write tools / WS poll / trades enrichment attach.
     """
 
-    reason: Any = None
-    code: Any = None
-    message: Any = None
-    request_id: str | None = None
-    timestamp: str | None = None
+    reason: Annotated[
+        Any,
+        Field(description="Rejection reason code/enum (the REJECTED state or an upstream error)."),
+    ] = None
+    code: Annotated[
+        Any, Field(description="Numeric or string rejection code, when the API provides one.")
+    ] = None
+    message: Annotated[Any, Field(description="Human-readable rejection message, if any.")] = None
+    request_id: Annotated[
+        str | None,
+        Field(
+            description="Paradigm request id from the response headers, for support correlation."
+        ),
+    ] = None
+    timestamp: Annotated[
+        str | None, Field(description="UTC ISO-8601 time the rejection was observed.")
+    ] = None

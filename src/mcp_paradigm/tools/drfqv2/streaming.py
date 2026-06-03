@@ -26,9 +26,14 @@ Channel = Literal["rfq", "order", "bbo", "trade", "trade_confirmation", "mmp"]
 class Subscription(PermissiveModel):
     """Owned ack returned by ``paradigm_subscribe``."""
 
-    subscription_id: str
-    channel: str
-    cancel_on_disconnect: bool | None = None
+    subscription_id: Annotated[
+        str, Field(description="Id to pass to paradigm_poll / paradigm_unsubscribe.")
+    ]
+    channel: Annotated[str, Field(description="The subscribed channel.")]
+    cancel_on_disconnect: Annotated[
+        bool | None,
+        Field(description="Cancel-on-disconnect in effect for the shared socket."),
+    ] = None
 
 
 class PollResult(PermissiveModel):
@@ -38,19 +43,31 @@ class PollResult(PermissiveModel):
     ``rejection`` block); they're passed through as ``Any``.
     """
 
-    subscription_id: str
-    channel: str
-    events: list[Any] = Field(default_factory=list)
-    cursor: int | None = None
-    connected: bool | None = None
+    subscription_id: Annotated[str, Field(description="The polled subscription id.")]
+    channel: Annotated[str, Field(description="The subscription's channel.")]
+    events: Annotated[
+        list[Any],
+        Field(
+            default_factory=list,
+            description="Buffered events since the last cursor; each carries seq/channel/received_at/data (and a `rejection` block when applicable).",
+        ),
+    ]
+    cursor: Annotated[
+        int | None,
+        Field(description="Cursor to pass back as `since` (advances automatically)."),
+    ] = None
+    connected: Annotated[
+        bool | None,
+        Field(description="False if the socket dropped — re-subscribe to reconnect."),
+    ] = None
 
 
 class Unsubscribed(PermissiveModel):
     """Owned ack returned by ``paradigm_unsubscribe``."""
 
-    subscription_id: str
-    channel: str
-    closed: bool | None = None
+    subscription_id: Annotated[str, Field(description="The closed subscription id.")]
+    channel: Annotated[str, Field(description="The channel that was closed.")]
+    closed: Annotated[bool | None, Field(description="Always true on success.")] = None
 
 
 # Channels whose events can carry a rejection we want to surface as a
