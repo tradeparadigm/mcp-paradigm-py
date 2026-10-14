@@ -50,6 +50,10 @@ class Config:
 
     SIGNING_DRIVER: str = os.getenv("PARADIGM_SIGNING_DRIVER", "env_key")
 
+    # Signing proxy: the proxy holds the key and replaces the placeholder signature.
+    PARADIGM_SIGNER_HEADER: str | None = _sanitize_env(os.getenv("PARADIGM_SIGNER_HEADER"))
+    PARADIGM_SIGNER_SIGNATURE: str | None = _sanitize_env(os.getenv("PARADIGM_SIGNER_SIGNATURE"))
+
     REQUEST_TIMEOUT_SECONDS: float = float(os.getenv("PARADIGM_TIMEOUT", "30"))
 
     WS_BUFFER_MAX_EVENTS: int = int(os.getenv("PARADIGM_WS_BUFFER", "1000"))
@@ -74,8 +78,25 @@ class Config:
         return _TEST_FSPD if cls.ENVIRONMENT == Environment.TESTNET else _PROD_FSPD
 
     @classmethod
+    def signer_config_error(cls) -> str | None:
+        """Name what is wrong with the signing proxy settings, or None."""
+        names = ("PARADIGM_SIGNER_HEADER", "PARADIGM_SIGNER_SIGNATURE")
+        if cls.SIGNING_DRIVER.lower() != "proxy":
+            stray = [n for n in names if getattr(cls, n)]
+            return (
+                f"{' and '.join(stray)} set without PARADIGM_SIGNING_DRIVER=proxy"
+                if stray
+                else None
+            )
+        missing = [n for n in names if not getattr(cls, n)]
+        return f"PARADIGM_SIGNING_DRIVER=proxy needs {' and '.join(missing)}" if missing else None
+
+    @classmethod
     def is_configured(cls) -> bool:
-        return bool(cls.PARADIGM_ACCESS_KEY and cls.PARADIGM_SIGNING_KEY)
+        return bool(
+            cls.PARADIGM_ACCESS_KEY
+            and (cls.PARADIGM_SIGNING_KEY or cls.SIGNING_DRIVER.lower() == "proxy")
+        )
 
 
 config = Config()

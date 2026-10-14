@@ -47,7 +47,7 @@ Set your Paradigm access key and signing key. The signing key is
 base64-encoded as issued by Paradigm.
 
 ```bash
-# Required — the server can't authenticate without these two:
+# Required, unless you sign through a signing proxy (below):
 export PARADIGM_ACCESS_KEY="..."         # bearer token (access key id)
 export PARADIGM_SIGNING_KEY="..."        # base64-encoded HMAC key
 
@@ -57,6 +57,35 @@ export PARADIGM_ENVIRONMENT="testnet"    # "prod" (default) or "testnet"
 # export PARADIGM_WS_URL="wss://ws.api.testnet.paradigm.trade/v2/drfq/"
 # export PARADIGM_ACCOUNT="my-desk"      # if running multi-desk
 ```
+
+### Signing proxy (no signing key)
+
+To sign through a proxy that holds the signing key, set
+`PARADIGM_SIGNING_DRIVER=proxy` and these two, and leave `PARADIGM_SIGNING_KEY` unset:
+
+- `PARADIGM_SIGNER_HEADER`: the header the server puts each signing message in, base64
+- `PARADIGM_SIGNER_SIGNATURE`: the placeholder the server sends as
+  `Paradigm-API-Signature`, for the proxy to replace
+
+Every tool call fails while either is missing, or while either is set with
+another driver. If `PARADIGM_SIGNING_KEY` is also set, the server logs a warning
+and uses the proxy.
+
+We wrote this for iron-proxy, the signing proxy DIME Terminal runs in front of
+its agents. Another proxy has to do what iron-proxy does with these headers.
+For example, with `PARADIGM_SIGNING_DRIVER=proxy` and
+`PARADIGM_SIGNER_HEADER=X-Dime-Sign-paradigm-mainnet-signing`,
+the server sends:
+
+```
+Paradigm-API-Timestamp: 1760000000000
+Paradigm-API-Signature: <PARADIGM_SIGNER_SIGNATURE>
+X-Dime-Sign-paradigm-mainnet-signing: base64("1760000000000\nGET\n/v2/drfq/rfqs/\n")
+```
+
+iron-proxy decodes `X-Dime-Sign-<label>`, signs it with HMAC-SHA256 using the key
+it holds for that label, swaps the base64 result in for the placeholder, and
+deletes the `X-Dime-Sign-<label>` header before forwarding the request.
 
 ## Run
 
